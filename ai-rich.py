@@ -127,35 +127,35 @@ class AIChat:
                 self.history.append({"role": "user", "content": user_input})
                 
                 with StreamingMarkdown() as streamer:
-                    # response = self.client.chat.completions.create(
-                    #     model=self.config["model"],
-                    #     messages=self.history,
-                    #     temperature=self.config["temperature"],
-                    #     stream=True
-                    # )
-                    def unit_test(l1, l2):
-                        class chunk:
-                            def __init__(self, t):
-                                class choice:
-                                    def __init__(self, t):
-                                        class content:
-                                            def __init__(self):
-                                                self.content = '# test\n'
-                                        class reasoning_content:
-                                            def __init__(self):
-                                                self.reasoning_content = 'test'*50
-                                        if t == 1:
-                                            self.delta = reasoning_content()
-                                        else:
-                                            self.delta = content()
-                                self.choices = [choice(t)]
-                        for _ in range(l1):
-                            time.sleep(0.4)
-                            yield chunk(1)
-                        for _ in range(l2):
-                            time.sleep(0.4)
-                            yield chunk(2)
-                    response = unit_test(20, 20)
+                    response = self.client.chat.completions.create(
+                        model=self.config["model"],
+                        messages=self.history,
+                        temperature=self.config["temperature"],
+                        stream=True
+                    )
+                    # def unit_test(l1, l2):
+                    #     class chunk:
+                    #         def __init__(self, t):
+                    #             class choice:
+                    #                 def __init__(self, t):
+                    #                     class content:
+                    #                         def __init__(self):
+                    #                             self.content = '# test\n'
+                    #                     class reasoning_content:
+                    #                         def __init__(self):
+                    #                             self.reasoning_content = 'test'*50
+                    #                     if t == 1:
+                    #                         self.delta = reasoning_content()
+                    #                     else:
+                    #                         self.delta = content()
+                    #             self.choices = [choice(t)]
+                    #     for _ in range(l1):
+                    #         time.sleep(0.4)
+                    #         yield chunk(1)
+                    #     for _ in range(l2):
+                    #         time.sleep(0.4)
+                    #         yield chunk(2)
+                    # response = unit_test(20, 20)
 
                     streamer.update(f"> 󰟷 **THINK**\n> ")
                     reasoning_content = ""

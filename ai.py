@@ -5,6 +5,12 @@ import json
 from pathlib import Path
 from openai import OpenAI, Transport
 
+# 导入 readline 模块，用于支持上下键选择历史记录
+if os.name == 'posix':
+    import readline
+elif os.name == 'nt':
+    import pyreadline3 as readline
+
 # 配置文件路径
 CONFIG_DIR = Path("/home/byml/projects/my-style/ai_agent")
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -31,7 +37,7 @@ class AIChat:
 
     @staticmethod
     def load_config():
-        with open(CONFIG_FILE) as f:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
             config = json.load(f)
             
         if config["api_key"] == "your-api-key-here":
@@ -43,27 +49,27 @@ class AIChat:
     def load_history(self):
         """加载对话历史"""
         # if HISTORY_FILE.exists():
-        #     with open(HISTORY_FILE) as f:
+        #     with open(HISTORY_FILE, encoding="utf-8") as f:
         #         return json.load(f)
         return []
 
     def save_history(self):
         """保存对话历史"""
-        with open(HISTORY_FILE, "w") as f:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(self.history[-self.config["max_history"]*2:], f, indent=2, ensure_ascii=False)
     
     def save_config(self):
         """保存配置"""
-        with open(CONFIG_FILE, "w") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(self.config, f, indent=2, ensure_ascii=False)
 
     def find_model(self, s:str):
         for model in self.config["models"]:
             if model["model"] == s:
-                return model
+                return model["model"]
             for alias in model["alias"]:
                 if alias == s:
-                    return model
+                    return model["model"]
         return None
 
     def chat(self):
@@ -100,9 +106,10 @@ class AIChat:
                     if model is not None:
                         self.config["model"] = model
                         self.save_config()
-                        print("╰─    模型切换成功")
+                        self.history = [self.history[0]]
+                        print(f"╰─    成功切换到模型：{model}")
                     else:
-                        print("╰─    模型不存在")
+                        print(f"╰─    模型不存在")
                     continue
                 if user_input.lower() == 'clear':
                     self.history = [self.history[0]]
@@ -139,13 +146,11 @@ class AIChat:
                         if delta.reasoning_content != "" and is_reasoning == False:
                             print("├─  󰟷  THINK", flush=True)
                             is_reasoning = True
-                        print(delta.reasoning_content, end="", flush=True)
+                        print(delta.reasoning_content.replace('\n', '\n│   '), end="", flush=True)
                         reasoning_content += delta.reasoning_content
                     else:
                         # 开始回复
                         if delta.content != "" and is_answering == False:
-                            if is_reasoning:
-                                print('\n├─────────────')
                             print("├─  󰛩  ANSWER \n│   ", end="",flush=True)
                             is_answering = True
                         # 打印回复过程
