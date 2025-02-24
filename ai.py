@@ -90,41 +90,16 @@ class AIChat:
                     return model["model"]
         return None
 
-    def chat(self, msg:str, test=False):
+    def chat(self, msg:str):
         """对话"""
-        def unit_test(l1, l2):
-            class chunk:
-                def __init__(self, t):
-                    class choice:
-                        def __init__(self, t):
-                            class content:
-                                def __init__(self):
-                                    self.content = '# test\n'
-                            class reasoning_content:
-                                def __init__(self):
-                                    self.reasoning_content = 'test'*50
-                            if t == 1:
-                                self.delta = reasoning_content()
-                            else:
-                                self.delta = content()
-                    self.choices = [choice(t)]
-            for _ in range(l1):
-                time.sleep(0.2)
-                yield chunk(1)
-            for _ in range(l2):
-                time.sleep(0.2)
-                yield chunk(2)
         try:
             self.history.append({"role": "user", "content": msg})
-            if test:
-                response = unit_test(10, 5)
-            else:
-                response = self.client.chat.completions.create(
-                    model=self.config["model"],
-                    messages=self.history,
-                    temperature=self.config["temperature"],
-                    stream=True
-                )
+            response = self.client.chat.completions.create(
+                model=self.config["model"],
+                messages=self.history,
+                temperature=self.config["temperature"],
+                stream=True
+            )
 
             print(f"╭─  󱚣  {self.config['model']}")
             reasoning_content = ""
@@ -271,7 +246,10 @@ class AIChat:
     def main(self):
         """执行对话"""
         try:
-            user_name = os.getenv("USER")
+            if os.name == 'posix':
+                user_name = os.getenv("USER")
+            elif os.name == 'nt':
+                user_name = os.getenv("USERNAME")
             while True:
                 user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
                 if user_input[0] == '/':
