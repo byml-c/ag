@@ -9,12 +9,9 @@
 
 ## Installation
 
-1. 选择合适的大模型服务商，或自己部署 Ollama 等本地服务。
-2. 安装如下软件/软件包：
-    - Python
-    - OpenAI 包
-    - pyreadline3 包（仅限 Windows 系统）
-3. 修改 `template_config.json` 中的 `api_key` 和 `base_url` 为你的 API Key 和 API Base URL。并改名为 `config.json`。
+1. 配置 Python 运行环境
+2. 在本目录下，运行 `python install.py`，会自动安装依赖并创建配置文件。
+3. 修改 `config.json` 中的 `api_key` 和 `base_url` 为你的 API Key 和 API Base URL。
 4. 给予运行权限 `sudo chmod +x ai.py`。
 5. 直接运行 `./ai.py`。
 
