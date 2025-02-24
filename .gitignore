@@ -1,4 +1,3 @@
-/config.json
-/config-aliyun.json
+/config*.json
 /ai.py
 /.agdata
