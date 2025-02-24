@@ -17,3 +17,7 @@
 3. 修改 `template_config.json` 中的 `api_key` 和 `base_url` 为你的 API Key 和 API Base URL。并改名为 `config.json`。
 4. 给予运行权限 `sudo chmod +x ai.py`。
 5. 直接运行 `./ai.py`。
+
+## Usage
+- 直接输入问题，按下回车键，即可得到回答。
+- 输入 `/help` 查看帮助信息。
