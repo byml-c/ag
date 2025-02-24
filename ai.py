@@ -51,6 +51,20 @@ class AIChat:
         """保存对话历史"""
         with open(HISTORY_FILE, "w") as f:
             json.dump(self.history[-self.config["max_history"]*2:], f, indent=2, ensure_ascii=False)
+    
+    def save_config(self):
+        """保存配置"""
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(self.config, f, indent=2, ensure_ascii=False)
+
+    def find_model(self, s:str):
+        for model in self.config["models"]:
+            if model["model"] == s:
+                return model
+            for alias in model["alias"]:
+                if alias == s:
+                    return model
+        return None
 
     def chat(self):
         """执行对话"""
@@ -58,16 +72,50 @@ class AIChat:
             user_name = os.getenv("USER")
             # 交互模式
             while True:
-                user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ")
+                user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
                 
+                if user_input.lower() == 'help':
+                    print()
+                    print("╭─  󰘥  Help")
+                    print("│   clear : 清空历史")
+                    print("│   change: 切换模型")
+                    print("│   help  : 查看帮助")
+                    print("│   exit  : 退出")
+                    print("╰─────────────")
+                    continue
+                if user_input[:6].lower() == 'change':
+                    if user_input == 'change':
+                        print()
+                        print(f"╭─    修改模型（当前模型：{self.config['model']}）")
+                        for model in self.config["models"]:
+                            print(f"│   {model['model']}: ", end="")
+                            for alias in model["alias"]:
+                                print(f"{alias} ", end="")
+                            print()
+                        print("├─────────────")
+                        model = input("│   请输入模型或别名: ")
+                    else:
+                        model = user_input[7:]
+                    model = self.find_model(model)
+                    if model is not None:
+                        self.config["model"] = model
+                        self.save_config()
+                        print("╰─    模型切换成功")
+                    else:
+                        print("╰─    模型不存在")
+                    continue
+                if user_input.lower() == 'clear':
+                    self.history = [self.history[0]]
+                    print()
+                    print("╭─    清空历史")
+                    print("╰─  历史已清空。")
+                    continue
                 if user_input.lower() in ['quit', 'exit', 'bye']:
                     self.save_history()
-                    print(f"\n╭─    Bye\n╰─  history saved.")
+                    print()
+                    print("╭─    再见")
+                    print("╰─  历史已保存。")
                     break
-                if user_input.lower() == 'clear':
-                    self.history = [h for h in self.history if h["role"] == "system"]
-                    print(f"\n╭─    Clean\n╰─  history cleaned.")
-                    continue
                 
                 self.history.append({"role": "user", "content": user_input})
                 
@@ -110,9 +158,13 @@ class AIChat:
                 })
         except KeyboardInterrupt:
             self.save_history()
-            print(f"\n╭─    Bye\n╰─  history saved.")
+            print()
+            print("╭─    中断")
+            print("╰─  历史已保存。")
         except Exception as e:
-            print(f"\n╭─    Error\n╰─  {str(e)}")
+            print()
+            print(f"╭─    错误")
+            print(f"╰─  {str(e)}")
             self.save_history()
 
 def main():
