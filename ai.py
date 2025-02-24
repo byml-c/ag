@@ -1,5 +1,4 @@
-#!/bin/env python3
-
+#!/bin/env python
 import os
 import re
 import sys
@@ -7,7 +6,7 @@ import json
 import time
 import subprocess
 from pathlib import Path
-from openai import OpenAI, Transport
+from openai import OpenAI
 
 # 导入 readline 模块，用于支持上下键选择历史记录
 if os.name == 'posix':
@@ -15,15 +14,25 @@ if os.name == 'posix':
 elif os.name == 'nt':
     import pyreadline3 as readline
 
+def load_config():
+    with open(CONFIG_FILE, encoding="utf-8") as f:
+        config = json.load(f)
+        
+    if config["api_key"] == "your-api-key-here":
+        print(f"请先配置API密钥: {CONFIG_FILE}")
+        sys.exit(1)
+    return config
+config = load_config()
+
 # 配置文件路径
-ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
+ROOT_DIR = Path(config["root"])
 CONFIG_FILE  = ROOT_DIR / "config.json"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
 
 class AIChat:
     def __init__(self):
-        self.config = self.load_config()
+        self.config = config
         os.environ['all_proxy'] = ''
         os.environ['http_proxy'] = ''
         os.environ['https_proxy'] = ''
@@ -41,17 +50,6 @@ class AIChat:
                 "role": "system",
                 "content": self.config["system_prompt"]
             })
-
-    @staticmethod
-    def load_config():
-        with open(CONFIG_FILE, encoding="utf-8") as f:
-            config = json.load(f)
-            
-        if config["api_key"] == "your-api-key-here":
-            print(f"请先配置API密钥: {CONFIG_FILE}")
-            sys.exit(1)
-            
-        return config
 
     def load_history(self):
         """加载对话历史"""
@@ -91,16 +89,41 @@ class AIChat:
                     return model["model"]
         return None
 
-    def chat(self, msg:str):
+    def chat(self, msg:str, test=False):
         """对话"""
+        def unit_test(l1, l2):
+            class chunk:
+                def __init__(self, t):
+                    class choice:
+                        def __init__(self, t):
+                            class content:
+                                def __init__(self):
+                                    self.content = '# test\n'
+                            class reasoning_content:
+                                def __init__(self):
+                                    self.reasoning_content = 'test'*50
+                            if t == 1:
+                                self.delta = reasoning_content()
+                            else:
+                                self.delta = content()
+                    self.choices = [choice(t)]
+            for _ in range(l1):
+                time.sleep(0.2)
+                yield chunk(1)
+            for _ in range(l2):
+                time.sleep(0.2)
+                yield chunk(2)
         try:
             self.history.append({"role": "user", "content": msg})
-            response = self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=self.history,
-                temperature=self.config["temperature"],
-                stream=True
-            )
+            if test:
+                response = unit_test(10, 5)
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.config["model"],
+                    messages=self.history,
+                    temperature=self.config["temperature"],
+                    stream=True
+                )
 
             print(f"╭─  󱚣  {self.config['model']}")
             reasoning_content = ""
@@ -247,10 +270,7 @@ class AIChat:
     def main(self):
         """执行对话"""
         try:
-            if os.name == 'posix':
-                user_name = os.getenv("USER")
-            elif os.name == 'nt':
-                user_name = os.getenv("USERNAME")
+            user_name = os.getenv("USER")
             while True:
                 user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
                 if user_input[0] == '/':
