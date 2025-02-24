@@ -14,25 +14,15 @@ if os.name == 'posix':
 elif os.name == 'nt':
     import pyreadline3 as readline
 
-def load_config():
-    with open(CONFIG_FILE, encoding="utf-8") as f:
-        config = json.load(f)
-        
-    if config["api_key"] == "your-api-key-here":
-        print(f"请先配置API密钥: {CONFIG_FILE}")
-        sys.exit(1)
-    return config
-config = load_config()
-
 # 配置文件路径
-ROOT_DIR = Path(config["root"])
+ROOT_DIR = Path("root_path_of_this_file")
 CONFIG_FILE  = ROOT_DIR / "config.json"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
 
 class AIChat:
     def __init__(self):
-        self.config = config
+        self.config = self.load_config()
         os.environ['all_proxy'] = ''
         os.environ['http_proxy'] = ''
         os.environ['https_proxy'] = ''
@@ -50,6 +40,16 @@ class AIChat:
                 "role": "system",
                 "content": self.config["system_prompt"]
             })
+    
+    @staticmethod
+    def load_config():
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+            
+        if config["api_key"] == "your-api-key-here":
+            print(f"请先配置API密钥: {CONFIG_FILE}")
+            sys.exit(1)
+        return config
 
     def load_history(self):
         """加载对话历史"""

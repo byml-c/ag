@@ -19,10 +19,14 @@ elif os.name == 'nt':
         os.system('pip install pyreadline')
 
 print("正在创建配置文件...")
-with open('template_config.json', 'r', encoding='utf-8') as f:
+with open('./package/template_config.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
-config['root'] = os.path.abspath(os.path.dirname(__file__))
 with open('config.json', 'w', encoding='utf-8') as f:
     json.dump(config, f, indent=4, ensure_ascii=False)
 
+with open('./package/ai.py', 'r', encoding='utf-8') as f:
+    ai = f.read().replace(
+        'root_path_of_this_file', os.path.dirname(os.path.abspath(__file__)))
+with open('ai.py', 'w', encoding='utf-8') as f:
+    f.write(ai)
 print('安装完成！')
