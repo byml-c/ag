@@ -1,3 +1,5 @@
+#!/bin/env python3
+
 import os
 import json
 
@@ -21,6 +23,6 @@ with open('template_config.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
 config['root'] = os.path.abspath(os.path.dirname(__file__))
 with open('config.json', 'w', encoding='utf-8') as f:
-    json.dump(config, f, indent=4)
+    json.dump(config, f, indent=4, ensure_ascii=False)
 
 print('安装完成！')

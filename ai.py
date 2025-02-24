@@ -1,4 +1,5 @@
-#!/home/byml/app/anaconda3/bin/python
+#!/bin/env python3
+
 import os
 import re
 import sys
