@@ -26,7 +26,11 @@ with open('config.json', 'w', encoding='utf-8') as f:
 
 with open('./package/ai.py', 'r', encoding='utf-8') as f:
     ai = f.read().replace(
-        'root_path_of_this_file', os.path.dirname(os.path.abspath(__file__)))
+        'root_path_of_this_file', os.path.dirname(
+            os.path.abspath(__file__)).replace('\\', '/'))
 with open('ai.py', 'w', encoding='utf-8') as f:
     f.write(ai)
+
+print('正在删除安装文件...')
+os.removedirs('./package')
 print('安装完成！')
