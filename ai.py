@@ -15,7 +15,7 @@ elif os.name == 'nt':
     import pyreadline3 as readline
 
 # 配置文件路径
-ROOT_DIR = Path("root_path_of_this_file")
+ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
 CONFIG_FILE  = ROOT_DIR / "config.json"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"

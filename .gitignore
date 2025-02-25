@@ -1,3 +1,3 @@
 /config*.json
-/ai.py
+!/template_config.json
 /.agdata
