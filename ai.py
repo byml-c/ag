@@ -53,6 +53,7 @@ class MDStreamRenderer:
             '*': 0,
             '`': 0,
             '>': 0,
+            '-': 0,
         }
         self.tags = {
             'header'     : 0,
@@ -64,7 +65,7 @@ class MDStreamRenderer:
         self.reasoning = False
         
     def _reset_inline(self):
-        for tag in ['#', '*', '`', '>']:
+        for tag in ['#', '*', '`', '>', '-']:
             self.buffer[tag] = 0
         for tag in ['bold', 'italic', 'inline_code']:
             self.tags[tag] = 0
@@ -77,21 +78,23 @@ class MDStreamRenderer:
     def print(self, chunk:str):
         # print(chunk, end='', flush=True)
         for c in chunk:
-            if c in ['#', '*', '`', '>']:
+            if c in ['#', '*', '`', '>', '-']:
                 self.buffer[c] += 1
             elif c == ' ' and self.new_line:
                 if self.buffer['#'] > 0:
                     h = f'h{min(6, self.buffer['#'])}'
                     self._print(f"{self.styles[h]}{self.icon[h]} ")
-                elif self.buffer['*'] == 1:
-                    self._print('• ')
-                    self.buffer['*'] = 0
+                    self.buffer['#'] = 0
+                elif self.buffer['*'] == 1 or self.buffer['-'] == 1:
+                    self._print('  ')
+                    self.buffer['*'] = self.buffer['-'] = 0
                 elif self.buffer['>'] > 0:
                     self._print(f"{self.styles['quote']}")
                     self.buffer['>'] = 0
             elif c == '\n':
                 self._reset_inline()
-                self._print('\n')
+                if not self.new_line:
+                    self._print('\n')
                 self.new_line = True
             else:
                 if self.buffer['*'] > 0:
@@ -109,7 +112,7 @@ class MDStreamRenderer:
                             self._print('*'*(self.buffer['*']-2))
                             self.tags['bold'] = self.tags['italic'] = 1
                     self.buffer['*'] = 0
-                if self.buffer['`'] > 0:
+                elif self.buffer['`'] > 0:
                     if self.tags['inline_code']:
                         self._print(self.styles['reset'])
                         self._print('`'*(self.buffer['`']-self.tags['bold']-self.tags['italic']))
@@ -118,6 +121,11 @@ class MDStreamRenderer:
                         self.tags['inline_code'] = 1
                         self._print(self.styles['inline_code'])
                     self.buffer['`'] = 0
+                else:
+                    for tag in ['#', '*', '`', '>', '-']:
+                        if self.buffer[tag] > 0:
+                            self._print(tag*self.buffer[tag])
+                            self.buffer[tag] = 0
                 self._print(c)
 
 class AIChat:
