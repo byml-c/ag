@@ -4,6 +4,7 @@ import re
 import sys
 import json
 import time
+import traceback
 import subprocess
 from pathlib import Path
 from openai import OpenAI
@@ -16,6 +17,108 @@ ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
 CONFIG_FILE  = ROOT_DIR / "config.json"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
+
+class MDStreamRenderer:
+    def __init__(self):
+        # self.styles = {
+        #     'bold'  : '\033[1m',
+        #     'italic': '\033[3m',
+        #     'h1': '\033[34m\033[1m',  # 蓝色加粗
+        #     'h2': '\033[34m\033[1m',  # 蓝色加粗
+        #     'h3': '\033[34m\033[1m',  # 蓝色加粗
+        #     'h4': '\033[34m\033[1m',  # 蓝色加粗
+        #     'h5': '\033[34m\033[1m',  # 蓝色加粗
+        #     'h6': '\033[34m\033[1m',  # 蓝色加粗
+        #     'inline_code': '\033[32m', # 绿色
+        #     'reset' : '\033[0m'
+        # }
+        self.styles = {
+            'bold': '\033[1m',
+            'italic': '\033[3m',
+            'h1': '\033[38;5;153m\033[1m',
+            'h2': '\033[38;5;117m\033[1m',
+            'h3': '\033[38;5;51m\033[1m',
+            'h4': '\033[38;5;45m\033[1m',
+            'h5': '\033[38;5;39m\033[1m',
+            'h6': '\033[38;5;33m\033[1m',
+            'inline_code': '\033[38;5;220m\033[48;5;236m',
+            'reset': '\033[0m',
+            'quote': '\033[37m\033[48;5;238m',
+        }
+        self.icon = {
+            'h1': '', 'h2': '', 'h3': '', 'h4': '', 'h5': '', 'h6': ''
+        }
+        self.buffer = {
+            '#': 0,
+            '*': 0,
+            '`': 0,
+            '>': 0,
+        }
+        self.tags = {
+            'header'     : 0,
+            'bold'       : 0,
+            'italic'     : 0,
+            'inline_code': 0,
+        }
+        self.new_line  = True
+        self.reasoning = False
+        
+    def _reset_inline(self):
+        for tag in ['#', '*', '`', '>']:
+            self.buffer[tag] = 0
+        for tag in ['bold', 'italic', 'inline_code']:
+            self.tags[tag] = 0
+        self._print(self.styles['reset'])
+
+    def _print(self, s):
+        self.new_line = False
+        print(s, end='', flush=True)
+
+    def print(self, chunk:str):
+        # print(chunk, end='', flush=True)
+        for c in chunk:
+            if c in ['#', '*', '`', '>']:
+                self.buffer[c] += 1
+            elif c == ' ' and self.new_line:
+                if self.buffer['#'] > 0:
+                    h = f'h{min(6, self.buffer['#'])}'
+                    self._print(f"{self.styles[h]}{self.icon[h]} ")
+                elif self.buffer['*'] == 1:
+                    self._print('• ')
+                    self.buffer['*'] = 0
+                elif self.buffer['>'] > 0:
+                    self._print(f"{self.styles['quote']}")
+                    self.buffer['>'] = 0
+            elif c == '\n':
+                self._reset_inline()
+                self._print('\n')
+                self.new_line = True
+            else:
+                if self.buffer['*'] > 0:
+                    if self.tags['bold'] or self.tags['italic']:
+                        self._print(self.styles['reset'])
+                        self.tags['bold'] = self.tags['italic'] = 0
+                    else:
+                        if self.buffer['*'] == 1:
+                            self._print(self.styles['italic'])
+                            self.tags['italic'] = 1
+                        elif self.buffer['*'] == 2:
+                            self._print(self.styles['bold'])
+                            self.tags['bold'] = 1
+                        else:
+                            self._print('*'*(self.buffer['*']-2))
+                            self.tags['bold'] = self.tags['italic'] = 1
+                    self.buffer['*'] = 0
+                if self.buffer['`'] > 0:
+                    if self.tags['inline_code']:
+                        self._print(self.styles['reset'])
+                        self._print('`'*(self.buffer['`']-self.tags['bold']-self.tags['italic']))
+                        self.tags['inline_code'] = 0
+                    else:
+                        self.tags['inline_code'] = 1
+                        self._print(self.styles['inline_code'])
+                    self.buffer['`'] = 0
+                self._print(c)
 
 class AIChat:
     def __init__(self):
@@ -37,6 +140,8 @@ class AIChat:
                 "role": "system",
                 "content": self.config["system_prompt"]
             })
+        
+        self.markdown = MDStreamRenderer()
     
     @staticmethod
     def load_config():
@@ -89,41 +194,16 @@ class AIChat:
                     return model["model"]
         return None
 
-    def chat(self, msg:str, test=False):
+    def chat(self, msg:str):
         """对话"""
-        def unit_test(l1, l2):
-            class chunk:
-                def __init__(self, t):
-                    class choice:
-                        def __init__(self, t):
-                            class content:
-                                def __init__(self):
-                                    self.content = '# test\n'
-                            class reasoning_content:
-                                def __init__(self):
-                                    self.reasoning_content = 'test'*50
-                            if t == 1:
-                                self.delta = reasoning_content()
-                            else:
-                                self.delta = content()
-                    self.choices = [choice(t)]
-            for _ in range(l1):
-                time.sleep(0.2)
-                yield chunk(1)
-            for _ in range(l2):
-                time.sleep(0.2)
-                yield chunk(2)
         try:
             self.history.append({"role": "user", "content": msg})
-            if test:
-                response = unit_test(10, 5)
-            else:
-                response = self.client.chat.completions.create(
-                    model=self.config["model"],
-                    messages=self.history,
-                    temperature=self.config["temperature"],
-                    stream=True
-                )
+            response = self.client.chat.completions.create(
+                model=self.config["model"],
+                messages=self.history,
+                temperature=self.config["temperature"],
+                stream=True
+            )
 
             print(f"╭─  󱚣  {self.config['model']}")
             reasoning_content = ""
@@ -138,17 +218,19 @@ class AIChat:
                     if delta.reasoning_content != "" and is_reasoning == False:
                         print("├─  󰟷  THINK", flush=True)
                         is_reasoning = True
-                    print(delta.reasoning_content, end="", flush=True)
+                        self.markdown.reasoning = True
+                    self.markdown.print(delta.reasoning_content)
                     reasoning_content += delta.reasoning_content
                 else:
                     # 开始回复
                     if delta.content != "" and is_answering == False:
                         if is_reasoning:
+                            self.markdown.reasoning = False
                             print()
                         print("├─  󰛩  ANSWER", flush=True)
                         is_answering = True
                     # 打印回复过程
-                    print(delta.content, end="", flush=True)
+                    self.markdown.print(delta.content)
                     answer_content += delta.content
             if is_reasoning or is_answering:
                 print()
@@ -169,6 +251,13 @@ class AIChat:
             cmd, shell=True, check=True, text=True, capture_output=True)
         cost_time = int((time.time() - start_time) * 1000)
         return result.stdout.strip(), cost_time, result.returncode
+
+    def short(self, s:str, l:int=30):
+        """缩短字符串"""
+        if len(s) > l:
+            return s[:l-10] + " ... " + s[-10:]
+        else:
+            return s
 
     def command(self, cmd:str):
         if cmd[:6] == 'change':
@@ -220,7 +309,7 @@ class AIChat:
             except Exception as e:
                 print(f"╰─    执行出错：{e}")
             return 'done'
-        elif cmd[:4] == 'varr':
+        elif cmd[:4] in ['varr', 'vart']:
             print()
             print(f"╭─    设置常值变量")
             try:
@@ -228,19 +317,19 @@ class AIChat:
                 out, cost_time, returncode = self.bash(cmd[1:])
                 self.vars["users"][cmd[0]] = out
                 self.save_vars()
-                print(f"├─  {cmd[0]} = \"{self.vars['users'][cmd[0]]}\"")
+                print(f"├─  {cmd[0]} = \"{self.short(self.vars['users'][cmd[0]])}\"")
                 print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
             except KeyboardInterrupt:
                 print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
             except Exception as e:
                 print(f"╰─    设置失败：{e}")
             return 'done'
-        elif cmd[:4] == 'varc':
+        elif cmd[:4] in ['varc', 'varb']:
             print()
             print(f"╭─    设置终端变量")
             try:
                 cmd = cmd[5:].split(' ', 1)
-                self.vars["bash"][cmd[0]] = cmd[:1]
+                self.vars["bash"][cmd[0]] = cmd[1]
                 self.save_vars()
                 print(f"├─  {cmd[0]} = \"{self.vars['bash'][cmd[0]]}\"")
                 print(f"╰─    设置成功")
@@ -265,11 +354,11 @@ class AIChat:
             for k, v in self.vars["users"].items():
                 if cmd == '' or re.match(cmd, k):
                     print_title('u')
-                    print(f"│   {k:6} = \"{v}\"")
+                    print(f"│   {k:6} = \"{self.short(v)}\"")
             for k, v in self.vars["bash"].items():
                 if cmd == '' or re.match(cmd, k):
                     print_title('b')
-                    print(f"│   {k:6} = \"{self.bash(v)[0]}\"")
+                    print(f"│   {k:6} = \"{v}\"")
             print("╰─────────────")
             return 'done'
         else:
@@ -315,7 +404,7 @@ class AIChat:
             user_name = os.getenv("USER")
             while True:
                 user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
-                if user_input[0] == '/':
+                if len(user_input) > 0 and user_input[0] == '/':
                     ret = self.command(user_input[1:])
                     if ret == 'exit':
                         break
@@ -326,15 +415,172 @@ class AIChat:
             print()
             print("╭─    终止")
             print("╰─  退出程序")
-        except Exception as e:
+        except Exception as _:
+            self.save_history()
             print()
             print(f"╭─    错误")
-            print(f"╰─  {str(e)}")
-            self.save_history()
+            print(f"╰─  {traceback.format_exc()}")
 
 def main():
     ai = AIChat()
     ai.main()
+#     import random
+#     md = MDStreamRenderer()
+#     testt = """
+# 这篇文章包含markdown语法基本的内容, 目的是放在自己的博客园上, 通过开发者控制台快速选中,  
+# 从而自定义自己博客园markdown样式.当然本文也可以当markdown语法学习之用.  
+
+# 在markdown里强制换行是在末尾添加2个空格+1个回车.  
+# 在markdown里可以使用 \\ 对特殊符号进行转义.  
+
+# # 1. 标题
+
+# **语法**
+# ```
+# # This is an <h1> tag
+# ## This is an <h2> tag
+# ### This is an <h3> tag
+# #### This is an <h4> tag
+# ##### This is an <h5> tag
+# ###### This is an <h6> tag
+# ```
+
+# **实例**
+
+# # This is an h1 tag
+# ## This is an h2 tag
+# ### This is an h3 tag
+# #### This is an h4 tag
+# ##### This is an h5 tag
+# ###### This is an h6 tag
+
+# # 2. 强调和斜体
+
+# **语法**
+# ```
+# *This text will be italic* This is not italic
+
+# **This text will be bold** This is not bold
+# ```
+# (个人不喜欢2个下划线中间包含的内容被斜体, 会和网址冲突, 我会在自定义博客园样式中去除这个样式.)  
+
+# **实例**
+
+# *This text will be italic* This is not italic
+
+# **This text will be bold** This is not bold
+
+# # 3. 有序列表和无序列表
+
+# **语法**
+# ```
+# * Item 1
+# * Item 2
+# * Item 3
+
+# 1. Item 1
+# 2. Item 2
+# 3. Item 3
+# ```
+
+# **实例**
+# * Item 1
+# * Item 2
+# * Item 3
+
+# 1. Item 1
+# 2. Item 2
+# 3. Item 3
+
+# # 4. 图片
+
+# **语法**
+# ```
+# ![img-name](img-url)
+# ```
+
+# **实例**
+# ![博客园logo](https://news.cnblogs.com/images/logo.gif)
+
+# # 5. 超链接
+
+# **语法**
+# ```
+# [link-name](link-url)
+# ```
+
+# **实例**
+
+# [阿胜4K](http://www.cnblogs.com/asheng2016/)
+
+# # 6. 引用
+
+# **语法**
+# ```
+# > 引用本意是引用别人的话之类  
+# > 但我个人喜欢把引用当成"注意"使用  
+# ```
+
+# **实例**
+
+# > If you please draw me a sheep!  
+# > 不想当将军的士兵, 不是好士兵.  
+
+# # 7. 单行代码
+
+# **语法**
+# ```
+# `This is an inline code.`
+# ```
+
+# **实例**
+
+# `同样的单行代码, 我经常用来显示特殊名词`
+
+# # 8. 多行代码
+
+# **语法**
+# ````
+# ​```javascript
+# for (var i=0; i<100; i++) {
+#     console.log("hello world" + i);
+# }
+# ​```
+# ````
+
+# **实例**
+
+# ```js
+# for (var i=0; i<100; i++) {
+#     console.log("hello world" + i);
+# }
+# ```
+
+# 也可以通过缩进来显示代码, 下面是示例:  
+
+#     console.loe("Hello_World");
+
+# # 参考链接
+
+# https://guides.github.com/features/mastering-markdown/  
+# https://help.github.com/articles/basic-writing-and-formatting-syntax/  
+# """
+#     def random_length():
+#         nonlocal testt
+#         while len(testt) > 0:
+#             time.sleep(0.1*random.random())
+#             length = random.randint(5, 15)
+#             if length > len(testt):
+#                 yield testt
+#                 break
+#             else:
+#                 gen = testt[:length]
+#                 testt = testt[length:]
+#                 yield gen
+#     for chunk in random_length():
+#         # print(chunk, end='', flush=True)
+#         md.print(chunk)
+#     print()
 
 if __name__ == "__main__":
     main()
