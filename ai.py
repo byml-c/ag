@@ -9,6 +9,14 @@ import subprocess
 from pathlib import Path
 from openai import OpenAI
 
+import random
+from rich.markdown import Markdown
+from rich.console import Console
+from rich.style import Style
+from rich.theme import Theme
+from rich.text import Text
+from rich.live import Live
+
 # 导入 readline 模块，用于支持上下键选择历史记录
 import readline
 
@@ -18,115 +26,76 @@ CONFIG_FILE  = ROOT_DIR / "config.json"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
 
+
+# 自定义主题
+custom_theme = Theme({
+    "markdown.block_quote": "#999999 on #1f1f1f",
+    "markdown.block_quote_border": "#d75f00",
+    "markdown.h1": "bold #1E90FF",
+    "markdown.h2": "bold #00BFFF",
+    "markdown.h3": "bold #87CEFA",
+    "markdown.h4": "bold #87CEEB",
+    "markdown.h5": "bold #E0FFFF",
+    "markdown.h6": "#E0FFFF"
+})
+console = Console(theme=custom_theme)
+
 class MDStreamRenderer:
     def __init__(self):
-        # self.styles = {
-        #     'bold'  : '\033[1m',
-        #     'italic': '\033[3m',
-        #     'h1': '\033[34m\033[1m',  # 蓝色加粗
-        #     'h2': '\033[34m\033[1m',  # 蓝色加粗
-        #     'h3': '\033[34m\033[1m',  # 蓝色加粗
-        #     'h4': '\033[34m\033[1m',  # 蓝色加粗
-        #     'h5': '\033[34m\033[1m',  # 蓝色加粗
-        #     'h6': '\033[34m\033[1m',  # 蓝色加粗
-        #     'inline_code': '\033[32m', # 绿色
-        #     'reset' : '\033[0m'
-        # }
-        self.styles = {
-            'bold': '\033[1m',
-            'italic': '\033[3m',
-            'h1': '\033[38;5;153m\033[1m',
-            'h2': '\033[38;5;117m\033[1m',
-            'h3': '\033[38;5;51m\033[1m',
-            'h4': '\033[38;5;45m\033[1m',
-            'h5': '\033[38;5;39m\033[1m',
-            'h6': '\033[38;5;33m\033[1m',
-            'inline_code': '\033[38;5;220m\033[48;5;236m',
-            'reset': '\033[0m',
-            'quote': '\033[37m\033[48;5;238m',
-        }
-        self.icon = {
-            'h1': '', 'h2': '', 'h3': '', 'h4': '', 'h5': '', 'h6': ''
-        }
-        self.buffer = {
-            '#': 0,
-            '*': 0,
-            '`': 0,
-            '>': 0,
-            '-': 0,
-        }
-        self.tags = {
-            'header'     : 0,
-            'bold'       : 0,
-            'italic'     : 0,
-            'inline_code': 0,
-        }
-        self.new_line  = True
-        self.reasoning = False
-        
-    def _reset_inline(self):
-        for tag in ['#', '*', '`', '>', '-']:
-            self.buffer[tag] = 0
-        for tag in ['bold', 'italic', 'inline_code']:
-            self.tags[tag] = 0
-        self._print(self.styles['reset'])
+        self.md = None
+        self.live = None
+        self.content = ""
+    
+    def __enter__(self):
+        self._new()
+        return self
+    
+    def _new(self):
+        if self.md is not None:
+            self.content, self.md = "", None
+            self.live.__exit__(None, None, None)
+        self.live = Live(console=console, refresh_per_second=15)
+        self.live.__enter__()
 
-    def _print(self, s):
-        self.new_line = False
-        print(s, end='', flush=True)
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.live is None:
+            return 
+        self.content, self.md = "", None
+        self.live.__exit__(None, None, None)
 
-    def print(self, chunk:str):
-        # print(chunk, end='', flush=True)
-        for c in chunk:
-            if c in ['#', '*', '`', '>', '-']:
-                self.buffer[c] += 1
-            elif c == ' ' and self.new_line:
-                if self.buffer['#'] > 0:
-                    h = f'h{min(6, self.buffer['#'])}'
-                    self._print(f"{self.styles[h]}{self.icon[h]} ")
-                    self.buffer['#'] = 0
-                elif self.buffer['*'] == 1 or self.buffer['-'] == 1:
-                    self._print('  ')
-                    self.buffer['*'] = self.buffer['-'] = 0
-                elif self.buffer['>'] > 0:
-                    self._print(f"{self.styles['quote']}")
-                    self.buffer['>'] = 0
-            elif c == '\n':
-                self._reset_inline()
-                if not self.new_line:
-                    self._print('\n')
-                self.new_line = True
-            else:
-                if self.buffer['*'] > 0:
-                    if self.tags['bold'] or self.tags['italic']:
-                        self._print(self.styles['reset'])
-                        self.tags['bold'] = self.tags['italic'] = 0
-                    else:
-                        if self.buffer['*'] == 1:
-                            self._print(self.styles['italic'])
-                            self.tags['italic'] = 1
-                        elif self.buffer['*'] == 2:
-                            self._print(self.styles['bold'])
-                            self.tags['bold'] = 1
-                        else:
-                            self._print('*'*(self.buffer['*']-2))
-                            self.tags['bold'] = self.tags['italic'] = 1
-                    self.buffer['*'] = 0
-                elif self.buffer['`'] > 0:
-                    if self.tags['inline_code']:
-                        self._print(self.styles['reset'])
-                        self._print('`'*(self.buffer['`']-self.tags['bold']-self.tags['italic']))
-                        self.tags['inline_code'] = 0
-                    else:
-                        self.tags['inline_code'] = 1
-                        self._print(self.styles['inline_code'])
-                    self.buffer['`'] = 0
+    def _update(self, chunk, edl:str='\n\n'):
+        self.content += chunk+edl
+        try:
+            # 使用自定义主题的 Markdown
+            self.md = Markdown(
+                self.content, 
+                code_theme="monokai",
+                inline_code_lexer="text"
+            )
+
+            self.live.update(self.md)
+            if edl == '\n\n':
+                self._new()
+                self.live.console.print()
+        except:
+            self.live.update(Text(self.content))
+
+    def update(self, chunk:str):
+        chunk = re.sub(r"\n{2,}", "\n\n", chunk)
+        buffer, length, i = "", len(chunk), 0
+        while i < length:
+            if chunk[i] == '\n':
+                if i+1 < length and chunk[i+1] == '\n':
+                    self._update(buffer, '\n\n')
+                    i = i+1
                 else:
-                    for tag in ['#', '*', '`', '>', '-']:
-                        if self.buffer[tag] > 0:
-                            self._print(tag*self.buffer[tag])
-                            self.buffer[tag] = 0
-                self._print(c)
+                    self._update(buffer, '\n')
+                buffer = ""
+            else:
+                buffer += chunk[i]
+            i += 1
+        if buffer != "":
+            self._update(buffer, '')
 
 class AIChat:
     def __init__(self):
@@ -148,8 +117,6 @@ class AIChat:
                 "role": "system",
                 "content": self.config["system_prompt"]
             })
-        
-        self.markdown = MDStreamRenderer()
     
     @staticmethod
     def load_config():
@@ -163,9 +130,9 @@ class AIChat:
 
     def load_history(self):
         """加载对话历史"""
-        if HISTORY_FILE.exists():
-            with open(HISTORY_FILE, encoding="utf-8") as f:
-                return json.load(f)
+        # if HISTORY_FILE.exists():
+        #     with open(HISTORY_FILE, encoding="utf-8") as f:
+        #         return json.load(f)
         return []
     
     def load_vars(self):
@@ -217,29 +184,30 @@ class AIChat:
             reasoning_content = ""
             answer_content = ""
             is_reasoning, is_answering = False, False
-            for chunk in response:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                # 打印思考过程
-                if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
-                    if delta.reasoning_content != "" and is_reasoning == False:
-                        print("├─  󰟷  THINK", flush=True)
-                        is_reasoning = True
-                        self.markdown.reasoning = True
-                    self.markdown.print(delta.reasoning_content)
-                    reasoning_content += delta.reasoning_content
-                else:
-                    # 开始回复
-                    if delta.content != "" and is_answering == False:
-                        if is_reasoning:
-                            self.markdown.reasoning = False
-                            print()
-                        print("├─  󰛩  ANSWER", flush=True)
-                        is_answering = True
-                    # 打印回复过程
-                    self.markdown.print(delta.content)
-                    answer_content += delta.content
+            with MDStreamRenderer() as markdown:
+                for chunk in response:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    # 打印思考过程
+                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
+                        if delta.reasoning_content != "" and is_reasoning == False:
+                            print("├─  󰟷  THINK", flush=True)
+                            markdown.update('> ')
+                            is_reasoning = True
+                        markdown.update(delta.reasoning_content.replace('\n', '\n> '))
+                        reasoning_content += delta.reasoning_content
+                    else:
+                        # 开始回复
+                        if delta.content != "" and is_answering == False:
+                            if is_reasoning:
+                                markdown._new()
+                                print()
+                            print("├─  󰛩  ANSWER", flush=True)
+                            is_answering = True
+                        # 打印回复过程
+                        markdown.update(delta.content)
+                        answer_content += delta.content
             if is_reasoning or is_answering:
                 print()
             print('╰─────────────')
@@ -285,7 +253,6 @@ class AIChat:
             if model is not None:
                 self.config["model"] = model
                 self.save_config()
-                self.history = [self.history[0]]
                 print(f"╰─    成功切换到模型：{model}")
             else:
                 print(f"╰─    模型不存在")
@@ -432,163 +399,7 @@ class AIChat:
 def main():
     ai = AIChat()
     ai.main()
-#     import random
-#     md = MDStreamRenderer()
-#     testt = """
-# 这篇文章包含markdown语法基本的内容, 目的是放在自己的博客园上, 通过开发者控制台快速选中,  
-# 从而自定义自己博客园markdown样式.当然本文也可以当markdown语法学习之用.  
-
-# 在markdown里强制换行是在末尾添加2个空格+1个回车.  
-# 在markdown里可以使用 \\ 对特殊符号进行转义.  
-
-# # 1. 标题
-
-# **语法**
-# ```
-# # This is an <h1> tag
-# ## This is an <h2> tag
-# ### This is an <h3> tag
-# #### This is an <h4> tag
-# ##### This is an <h5> tag
-# ###### This is an <h6> tag
-# ```
-
-# **实例**
-
-# # This is an h1 tag
-# ## This is an h2 tag
-# ### This is an h3 tag
-# #### This is an h4 tag
-# ##### This is an h5 tag
-# ###### This is an h6 tag
-
-# # 2. 强调和斜体
-
-# **语法**
-# ```
-# *This text will be italic* This is not italic
-
-# **This text will be bold** This is not bold
-# ```
-# (个人不喜欢2个下划线中间包含的内容被斜体, 会和网址冲突, 我会在自定义博客园样式中去除这个样式.)  
-
-# **实例**
-
-# *This text will be italic* This is not italic
-
-# **This text will be bold** This is not bold
-
-# # 3. 有序列表和无序列表
-
-# **语法**
-# ```
-# * Item 1
-# * Item 2
-# * Item 3
-
-# 1. Item 1
-# 2. Item 2
-# 3. Item 3
-# ```
-
-# **实例**
-# * Item 1
-# * Item 2
-# * Item 3
-
-# 1. Item 1
-# 2. Item 2
-# 3. Item 3
-
-# # 4. 图片
-
-# **语法**
-# ```
-# ![img-name](img-url)
-# ```
-
-# **实例**
-# ![博客园logo](https://news.cnblogs.com/images/logo.gif)
-
-# # 5. 超链接
-
-# **语法**
-# ```
-# [link-name](link-url)
-# ```
-
-# **实例**
-
-# [阿胜4K](http://www.cnblogs.com/asheng2016/)
-
-# # 6. 引用
-
-# **语法**
-# ```
-# > 引用本意是引用别人的话之类  
-# > 但我个人喜欢把引用当成"注意"使用  
-# ```
-
-# **实例**
-
-# > If you please draw me a sheep!  
-# > 不想当将军的士兵, 不是好士兵.  
-
-# # 7. 单行代码
-
-# **语法**
-# ```
-# `This is an inline code.`
-# ```
-
-# **实例**
-
-# `同样的单行代码, 我经常用来显示特殊名词`
-
-# # 8. 多行代码
-
-# **语法**
-# ````
-# ​```javascript
-# for (var i=0; i<100; i++) {
-#     console.log("hello world" + i);
-# }
-# ​```
-# ````
-
-# **实例**
-
-# ```js
-# for (var i=0; i<100; i++) {
-#     console.log("hello world" + i);
-# }
-# ```
-
-# 也可以通过缩进来显示代码, 下面是示例:  
-
-#     console.loe("Hello_World");
-
-# # 参考链接
-
-# https://guides.github.com/features/mastering-markdown/  
-# https://help.github.com/articles/basic-writing-and-formatting-syntax/  
-# """
-#     def random_length():
-#         nonlocal testt
-#         while len(testt) > 0:
-#             time.sleep(0.1*random.random())
-#             length = random.randint(5, 15)
-#             if length > len(testt):
-#                 yield testt
-#                 break
-#             else:
-#                 gen = testt[:length]
-#                 testt = testt[length:]
-#                 yield gen
-#     for chunk in random_length():
-#         # print(chunk, end='', flush=True)
-#         md.print(chunk)
-#     print()
+    return 
 
 if __name__ == "__main__":
     main()
