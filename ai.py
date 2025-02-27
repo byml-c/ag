@@ -18,7 +18,7 @@ from thirdparty.rich.text import Text
 from thirdparty.rich.live import Live
 
 # 导入 readline 模块，用于支持上下键选择历史记录
-import readline
+# import readline
 
 # 配置文件路径
 ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
@@ -60,7 +60,7 @@ class MDStreamRenderer:
         if self.md is not None:
             self.live.__exit__(None, None, None)
         self.content = text
-        self.live = Live(console=console, auto_refresh=False)
+        self.live = Live(console=console, refresh_per_second=10)
         self.live.__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -203,7 +203,9 @@ class AIChat:
 
     def update_snap(self):
         os.makedirs(SNAPS_DIR, exist_ok=True)
+        os.system(f'rm {SNAPS_DIR / "*"}')
         for sid in range(len(self.history['snap'])):
+            os.environ[f'S{sid}'] = str(SNAPS_DIR / f"{sid}")
             with open(SNAPS_DIR / f"{sid}", "w", encoding="utf-8") as f:
                 f.write(self.history['snap'][sid]['code'])
 
@@ -215,6 +217,74 @@ class AIChat:
                 if alias == s:
                     return model["model"]
         return None
+    
+    def get_user(self):
+        return os.getenv("USER")
+
+    def _render_response(self, response):
+        reasoning_content, answer_content = "", ""
+        is_reasoning, is_answering = False, False
+        with MDStreamRenderer(len(self.history['snap'])) as markdown:
+            for chunk in response:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                # 打印思考过程
+                if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
+                    if delta.reasoning_content != "" and is_reasoning == False:
+                        print("├─  󰟷  THINK", flush=True)
+                        markdown.update('> ')
+                        is_reasoning = True
+                    markdown.update(delta.reasoning_content.replace('\n', '\n> '))
+                    reasoning_content += delta.reasoning_content
+                else:
+                    # 开始回复
+                    if delta.content != "" and is_answering == False:
+                        if is_reasoning:
+                            markdown._new()
+                            print()
+                        print("├─  󰛩  ANSWER", flush=True)
+                        is_answering = True
+                    # 打印回复过程
+                    markdown.update(delta.content)
+                    answer_content += delta.content
+            markdown._end()
+            self.history['snap'] += markdown.code_list
+            self.update_snap()
+        if is_reasoning or is_answering:
+            print()
+        return reasoning_content, answer_content
+
+    def _render_history(self):
+        class Delta:
+            def __init__(self, c, r):
+                if r:
+                    self.reasoning_content = c
+                else:
+                    self.content = c
+        class Choice:
+            def __init__(self, c, r):
+                self.delta = Delta(c, r)
+        class Chunk:
+            def __init__(self, text, reasoning=False):
+                self.choices = [
+                    Choice(text, reasoning)
+                ]
+        def gen(s:str, batch:int=100):
+            for i in range(0, len(s), batch):
+                yield Chunk(s[i:i+batch])
+
+        for item in self.history['history']:
+            if item['role'] == 'user':
+                print(f"╭─  󱋊  User")
+                print(f"╰─  {item['content']}")
+            elif item['role'] == 'assistant':
+                print(f"╭─  󱚣  Model")
+                try:
+                    _1, _2 = self._render_response(gen(item['content']))
+                except:
+                    print(traceback.format_exc())
+                print(f'╰─────────────')
 
     def chat(self, msg:str):
         """对话"""
@@ -228,38 +298,7 @@ class AIChat:
             )
 
             print(f"╭─  󱚣  {self.config['model']}")
-            reasoning_content = ""
-            answer_content = ""
-            is_reasoning, is_answering = False, False
-            with MDStreamRenderer(len(self.history['snap'])) as markdown:
-                for chunk in response:
-                    if not chunk.choices:
-                        continue
-                    delta = chunk.choices[0].delta
-                    # 打印思考过程
-                    if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
-                        if delta.reasoning_content != "" and is_reasoning == False:
-                            print("├─  󰟷  THINK", flush=True)
-                            markdown.update('> ')
-                            is_reasoning = True
-                        markdown.update(delta.reasoning_content.replace('\n', '\n> '))
-                        reasoning_content += delta.reasoning_content
-                    else:
-                        # 开始回复
-                        if delta.content != "" and is_answering == False:
-                            if is_reasoning:
-                                markdown._new()
-                                print()
-                            print("├─  󰛩  ANSWER", flush=True)
-                            is_answering = True
-                        # 打印回复过程
-                        markdown.update(delta.content)
-                        answer_content += delta.content
-                markdown._end()
-                self.history['snap'] += markdown.code_list
-                self.update_snap()
-            if is_reasoning or is_answering:
-                print()
+            _, answer_content = self._render_response(response)
             print('╰─────────────')
             self.history['history'].append({
                 "role": "assistant",
@@ -310,7 +349,7 @@ class AIChat:
                 print(f"╰─    模型不存在")
             return 'done'
         elif cmd in ['cls', 'clear']:
-            os.system('clear')
+            os.system('cls')
             return 'done'
         elif cmd == 'forget':
             self.history['history'] = [self.history['history'][0]]
@@ -345,8 +384,15 @@ class AIChat:
                 if hist >= 0 and hist < len(hist_files):
                     self.hist_path = hist_files[hist]
                     self.history = self.load_history(False)
-                    self.update_snap()
-                    print(f"╰─    成功切换到历史记录：{hist_files[hist].name.replace('.json', '')}")
+                    print(f"├─    成功切换到历史记录：{hist_files[hist].name.replace('.json', '')}")
+                    record = input("├─  是否需要打印历史记录？[y/n]: ").lower()
+                    if record == 'y':
+                        self.command('clear')
+                        self.history['snap'] = []
+                        self._render_history()
+                    else:
+                        self.update_snap()
+                        print(f"╰─────────────")
                 else:
                     raise Exception("Records is not exist.")
             except:
@@ -423,7 +469,7 @@ class AIChat:
             for sid in range(len(self.history['snap'])):
                 snap = self.history['snap'][sid]
                 if cmd == '' or snap['lang'] == cmd:
-                    print(f"│   {sid:3} [{snap['lang']:10}]: {self.short(snap['code'])!r}")
+                    print(f"│   $S{sid:<3} [{snap['lang']:10}]: {self.short(snap['code'])!r}")
             print("╰─────────────")
             return 'done'
         else:
@@ -468,7 +514,7 @@ class AIChat:
     def main(self):
         """执行对话"""
         try:
-            user_name = os.getenv("USER")
+            user_name = self.get_user()
             while True:
                 user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
                 if len(user_input) > 0 and user_input[0] == '/':

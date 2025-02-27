@@ -1,20 +1,4 @@
 #!/bin/bash
-if [[ $(which python3) == "" ]]; then
-    echo "Installing Python3"
-    sudo apt-get install python3
-fi
-
-if [[ $(which pip3) == "" ]]; then
-    echo "Installing pip3"
-    sudo apt-get install python3-pip
-fi
-
-if [[ $(pip show openai) == "" ]]; then
-    echo "Installing openai"
-    pip3 install openai
-fi
-
-echo "--------------------"
 echo "Setting up the working directory"
 ROOT_DIR=$(pwd)
 ROOT_DIR_R=$(echo $ROOT_DIR | sed -E 's/\//\\\//g')
@@ -31,17 +15,12 @@ else
     "system_prompt": "你是一个熟悉计算机并具有丰富教学经验的 AI 助手，无论提出问题的是什么语言，请用中文回答我的问题",
     "models": [
         {
-            "model": "deepseek-v3",
-            "alias": ["v3"]
-        },
-        {
-            "model": "deepseek-r1",
-            "alias": ["r1"]
+            "model": "",
+            "alias": [""]
         }
     ],
-    "model": "deepseek-v3",
-    "temperature": 0.5,
-    "max_history": 100
+    "model": "",
+    "temperature": 0.5
 }' > config.json
 fi
 
@@ -56,6 +35,7 @@ while true; do
         break
     elif [ "$answer" = "n" ]; then
         echo "Skipping..."
+        break
     else
         echo "Invalid input, please enter y or n."
     fi
