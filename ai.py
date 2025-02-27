@@ -349,7 +349,7 @@ class AIChat:
                 print(f"╰─    模型不存在")
             return 'done'
         elif cmd in ['cls', 'clear']:
-            os.system('cls')
+            os.system('clear')
             return 'done'
         elif cmd == 'forget':
             self.history['history'] = [self.history['history'][0]]
@@ -535,6 +535,7 @@ class AIChat:
             if self.hist_path == HISTORY_FILE:
                 time_str = time.strftime(r"%Y-%m-%d_%H-%M-%S", time.localtime())
                 self.hist_path = HISTORY_DIR / f"{time_str}.json"
+                os.remove(HISTORY_FILE)
             self.save_history()
 
 def main():
