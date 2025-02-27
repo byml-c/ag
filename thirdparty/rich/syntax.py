@@ -626,11 +626,8 @@ class Syntax(JupyterMixin):
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         segments = Segments(self._get_syntax(console, options))
-        if self.padding:
-            yield Padding(segments, style=self._get_base_style(), pad=self.padding)
-        else:
-            yield segments
-        yield Padding(Text(f'{self._lexer}', self._get_base_style(), justify="right", end=""), style=self._get_base_style(), pad=(0, 2, 0, 0))
+        yield segments
+        yield Text(f'[ {self._lexer} ]', self._get_base_style(), justify="right", end="")
 
     def _get_syntax(
         self,

@@ -35,35 +35,50 @@ custom_theme = Theme({
     "markdown.h3": "bold #87CEFA",
     "markdown.h4": "bold #87CEEB",
     "markdown.h5": "bold #E0FFFF",
-    "markdown.h6": "#E0FFFF"
+    "markdown.h6": "#E0FFFF",
+    "live.ellipsis": "#e6db74 on #272822"
 })
 console = Console(theme=custom_theme)
 
 class MDStreamRenderer:
-    def __init__(self):
+    def __init__(self, code_start:int):
         self.md = None
         self.live = None
+        self.code_start = code_start
+        self.code_list = []
         self.content = ""
     
     def __enter__(self):
         self._new()
+        self.code_list = []
         return self
     
-    def _new(self):
+    def _new(self, text=''):
         if self.md is not None:
-            self.content, self.md = "", None
             self.live.__exit__(None, None, None)
-        self.live = Live(console=console, refresh_per_second=15)
+        self.content = text
+        self.live = Live(console=console, auto_refresh=False)
         self.live.__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.live is None:
             return 
-        self.content, self.md = "", None
-        self.live.__exit__(None, None, None)
+        self.live.__exit__(exc_type, exc_value, traceback)
 
-    def _update(self, chunk, edl:str='\n\n'):
-        self.content += chunk+edl
+    def _add_snap(self, lang, code):
+        self.code_list.append({"lang": lang, "code": code})
+        cid = self.code_start+len(self.code_list)-1
+        console.print(Text(f'   snap {cid}  ', justify='right', style="#e6db74 on #272822"),
+                      Text(f'', justify='right', style="#272822"), sep='')
+
+    def _end(self):
+        if self.md is not None and len(self.code_list) > 0:
+            c = self.md.parsed[-1]
+            if c.type == 'fence' and c.block:
+                self._add_snap(c.info, c.content)
+
+    def _update(self, edl:str=''):
+        self.content += edl
         try:
             # 使用自定义主题的 Markdown
             self.md = Markdown(
@@ -71,30 +86,46 @@ class MDStreamRenderer:
                 code_theme="monokai",
                 inline_code_lexer="text"
             )
-
-            self.live.update(self.md)
-            if edl == '\n\n':
-                self._new()
-                self.live.console.print()
+            
+            c = self.md.parsed[-1]
+            if c.type == 'fence' and c.block:
+                if len(self.md.parsed) > 1:
+                    self.md.parsed.pop()
+                    last_pose = self.content.rfind('```')
+                    self.live.update(self.md, refresh=True)
+                    self._new(self.content[last_pose:])
+                else:
+                    self.live.update(self.md, refresh=True)
+            else:
+                c = self.md.parsed[0]
+                if c.type == 'fence' and c.block:
+                    code_end = self.content.rfind('```')
+                    if code_end != -1:
+                        self._add_snap(c.info, c.content)
+                        self._new(self.content[code_end+3:])
+                else:
+                    self.live.update(self.md, refresh=True)
+                    if edl == '\n\n':
+                        self._new()
+                        console.print()
         except:
-            self.live.update(Text(self.content))
+            self.live.update(Text(self.content), refresh=True)
 
     def update(self, chunk:str):
         chunk = re.sub(r"\n{2,}", "\n\n", chunk)
-        buffer, length, i = "", len(chunk), 0
+        length, i = len(chunk), 0
         while i < length:
             if chunk[i] == '\n':
                 if i+1 < length and chunk[i+1] == '\n':
-                    self._update(buffer, '\n\n')
+                    self._update('\n\n')
                     i = i+1
                 else:
-                    self._update(buffer, '\n')
-                buffer = ""
+                    self._update('\n')
             else:
-                buffer += chunk[i]
+                self.content += chunk[i]
             i += 1
-        if buffer != "":
-            self._update(buffer, '')
+        if self.content != "":
+            self._update()
 
 class AIChat:
     def __init__(self):
@@ -111,8 +142,8 @@ class AIChat:
         self.vars = self.load_vars()
         
         # 初始化系统提示
-        if not any(msg["role"] == "system" for msg in self.history):
-            self.history.insert(0, {
+        if not any(msg["role"] == "system" for msg in self.history['history']):
+            self.history['history'].insert(0, {
                 "role": "system",
                 "content": self.config["system_prompt"]
             })
@@ -132,7 +163,10 @@ class AIChat:
         # if HISTORY_FILE.exists():
         #     with open(HISTORY_FILE, encoding="utf-8") as f:
         #         return json.load(f)
-        return []
+        return {
+            'history': [],
+            'snap': []
+        }
     
     def load_vars(self):
         """加载变量"""
@@ -171,19 +205,21 @@ class AIChat:
     def chat(self, msg:str):
         """对话"""
         try:
-            self.history.append({"role": "user", "content": msg})
-            response = self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=self.history,
-                temperature=self.config["temperature"],
-                stream=True
-            )
+            self.history['history'].append({"role": "user", "content": msg})
+            # response = self.client.chat.completions.create(
+            #     model=self.config["model"],
+            #     messages=self.history['history'],
+            #     temperature=self.config["temperature"],
+            #     stream=True
+            # )
+            import debug
+            response = debug.gen()
 
             print(f"╭─  󱚣  {self.config['model']}")
             reasoning_content = ""
             answer_content = ""
             is_reasoning, is_answering = False, False
-            with MDStreamRenderer() as markdown:
+            with MDStreamRenderer(len(self.history['snap'])) as markdown:
                 for chunk in response:
                     if not chunk.choices:
                         continue
@@ -207,10 +243,12 @@ class AIChat:
                         # 打印回复过程
                         markdown.update(delta.content)
                         answer_content += delta.content
+                markdown._end()
+                self.history['snap'] += markdown.code_list
             if is_reasoning or is_answering:
                 print()
             print('╰─────────────')
-            self.history.append({
+            self.history['history'].append({
                 "role": "assistant",
                 "content": answer_content
             })
@@ -260,7 +298,8 @@ class AIChat:
             os.system('clear')
             return 'done'
         elif cmd == 'forget':
-            self.history = [self.history[0]]
+            self.history['history'] = [self.history['history'][0]]
+            self.history['snap'] = []
             print()
             print("╭─    清空历史")
             print("╰─  历史已清空。")
@@ -328,11 +367,21 @@ class AIChat:
             for k, v in self.vars["users"].items():
                 if cmd == '' or re.match(cmd, k):
                     print_title('u')
-                    print(f"│   {k:6} = \"{self.short(v)}\"")
+                    print(f"│   {k:10} = {self.short(v)!r}")
             for k, v in self.vars["bash"].items():
                 if cmd == '' or re.match(cmd, k):
                     print_title('b')
-                    print(f"│   {k:6} = \"{v}\"")
+                    print(f"│   {k:10} = {v!r}")
+            print("╰─────────────")
+            return 'done'
+        elif cmd[:4] == 'snap':
+            print()
+            print(f"╭─    代码列表")
+            cmd = cmd[5:].strip()
+            for sid in range(len(self.history['snap'])):
+                snap = self.history['snap'][sid]
+                if cmd == '' or snap['lang'] == cmd:
+                    print(f"│   {sid:3} [{snap['lang']:10}]: {self.short(snap['code'])!r}")
             print("╰─────────────")
             return 'done'
         else:
@@ -396,73 +445,9 @@ class AIChat:
             print(f"╰─  {traceback.format_exc()}")
 
 def main():
-    # ai = AIChat()
-    # ai.main()
-    # return 
-    pass
-    tt = '''这篇文章包含markdown语法基本的内容, 目的是放在自己的博客园上, 通过开发者控制台快速选中,  
-从而自定义自己博客园markdown样式.当然本文也可以当markdown语法学习之用.  
-
-在markdown里强制换行是在末尾添加2个空格+1个回车.  
-在markdown里可以使用 \\ 对特殊符号进行转义.  
-
-# 1. 标题
-
-# This is an h1 tag
-## This is an h2 tag
-### This is an h3 tag
-#### This is an h4 tag
-##### This is an h5 tag
-###### This is an h6 tag
-
-# 2. 强调和斜体
-
-*This text will be italic*
-_This will also be italic_
-
-**This text will be bold**
-__This will also be bold__
-
-# 3. 有序列表和无序列表
-
-* Item 1
-* Item 2
-* Item 3
-
-1. Item 1
-2. Item 2
-3. Item 3
-
-# 4. 图片
-
-![博客园logo](https://news.cnblogs.com/images/logo.gif)
-
-# 5. 超链接
-
-[阿胜4K](http://www.cnblogs.com/asheng2016/)
-
-# 6. 引用
-
-> If you please draw me a sheep!  
-> 不想当将军的士兵, 不是好士兵.  
-
-# 7. 单行代码
-
-`同样的单行代码, 我经常用来显示特殊名词`
-
-# 8. 多行代码
-
-```js
-for (var i=0; i<100; i++) {
-    console.log("hello world" + i);
-}
-```
-
-end
-'''
-    with MDStreamRenderer() as markdown:
-        markdown.update(tt)
-    print("done")
+    ai = AIChat()
+    ai.main()
+    return
 
 if __name__ == "__main__":
     main()

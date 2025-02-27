@@ -175,9 +175,8 @@ class CodeBlock(TextElement):
         code = str(self.text).rstrip()
         syntax = Syntax(
             code, self.lexer_name, theme=self.theme, word_wrap=True,
-            line_numbers=True, indent_guides=True, padding=(1, 0, 0, 0)
+            line_numbers=True, indent_guides=True
         )
-        # yield Panel(syntax, title=self.lexer_name, expand=False, border_style="blue")
         yield syntax
 
 
