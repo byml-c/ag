@@ -18,7 +18,7 @@ from thirdparty.rich.text import Text
 from thirdparty.rich.live import Live
 
 # 导入 readline 模块，用于支持上下键选择历史记录
-# import readline
+import readline
 
 # 配置文件路径
 ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
