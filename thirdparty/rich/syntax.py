@@ -630,6 +630,7 @@ class Syntax(JupyterMixin):
             yield Padding(segments, style=self._get_base_style(), pad=self.padding)
         else:
             yield segments
+        yield Padding(Text(f'{self._lexer}', self._get_base_style(), justify="right", end=""), style=self._get_base_style(), pad=(0, 2, 0, 0))
 
     def _get_syntax(
         self,

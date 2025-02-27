@@ -1,3 +1,3 @@
 /config*.json
-!/template_config.json
 /.agdata
+__pycache__

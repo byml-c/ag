@@ -149,19 +149,9 @@ class Heading(TextElement):
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         text = self.text
-        text.justify = "center"
-        if self.tag == "h1":
-            # Draw a border around h1s
-            yield Panel(
-                text,
-                box=box.HEAVY,
-                style="markdown.h1.border",
-            )
-        else:
-            # Styled text for h2 and beyond
-            if self.tag == "h2":
-                yield Text("")
-            yield text
+        text.justify = "left"
+        yield Text("  ", style=self.style_name, end="")
+        yield text
 
 
 class CodeBlock(TextElement):
@@ -184,8 +174,10 @@ class CodeBlock(TextElement):
     ) -> RenderResult:
         code = str(self.text).rstrip()
         syntax = Syntax(
-            code, self.lexer_name, theme=self.theme, word_wrap=True, padding=1
+            code, self.lexer_name, theme=self.theme, word_wrap=True,
+            line_numbers=True, indent_guides=True, padding=(1, 0, 0, 0)
         )
+        # yield Panel(syntax, title=self.lexer_name, expand=False, border_style="blue")
         yield syntax
 
 

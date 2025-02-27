@@ -9,13 +9,12 @@ import subprocess
 from pathlib import Path
 from openai import OpenAI
 
-import random
-from rich.markdown import Markdown
-from rich.console import Console
-from rich.style import Style
-from rich.theme import Theme
-from rich.text import Text
-from rich.live import Live
+from thirdparty.rich.markdown import Markdown
+from thirdparty.rich.console import Console
+from thirdparty.rich.style import Style
+from thirdparty.rich.theme import Theme
+from thirdparty.rich.text import Text
+from thirdparty.rich.live import Live
 
 # 导入 readline 模块，用于支持上下键选择历史记录
 import readline
@@ -397,9 +396,73 @@ class AIChat:
             print(f"╰─  {traceback.format_exc()}")
 
 def main():
-    ai = AIChat()
-    ai.main()
-    return 
+    # ai = AIChat()
+    # ai.main()
+    # return 
+    pass
+    tt = '''这篇文章包含markdown语法基本的内容, 目的是放在自己的博客园上, 通过开发者控制台快速选中,  
+从而自定义自己博客园markdown样式.当然本文也可以当markdown语法学习之用.  
+
+在markdown里强制换行是在末尾添加2个空格+1个回车.  
+在markdown里可以使用 \\ 对特殊符号进行转义.  
+
+# 1. 标题
+
+# This is an h1 tag
+## This is an h2 tag
+### This is an h3 tag
+#### This is an h4 tag
+##### This is an h5 tag
+###### This is an h6 tag
+
+# 2. 强调和斜体
+
+*This text will be italic*
+_This will also be italic_
+
+**This text will be bold**
+__This will also be bold__
+
+# 3. 有序列表和无序列表
+
+* Item 1
+* Item 2
+* Item 3
+
+1. Item 1
+2. Item 2
+3. Item 3
+
+# 4. 图片
+
+![博客园logo](https://news.cnblogs.com/images/logo.gif)
+
+# 5. 超链接
+
+[阿胜4K](http://www.cnblogs.com/asheng2016/)
+
+# 6. 引用
+
+> If you please draw me a sheep!  
+> 不想当将军的士兵, 不是好士兵.  
+
+# 7. 单行代码
+
+`同样的单行代码, 我经常用来显示特殊名词`
+
+# 8. 多行代码
+
+```js
+for (var i=0; i<100; i++) {
+    console.log("hello world" + i);
+}
+```
+
+end
+'''
+    with MDStreamRenderer() as markdown:
+        markdown.update(tt)
+    print("done")
 
 if __name__ == "__main__":
     main()

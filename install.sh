@@ -14,11 +14,6 @@ if [[ $(pip show openai) == "" ]]; then
     pip3 install openai
 fi
 
-if [[ $(pip show rich) == "" ]]; then
-    echo "Installing rich"
-    pip3 install rich
-fi
-
 echo "--------------------"
 echo "Setting up the working directory"
 ROOT_DIR=$(pwd)
