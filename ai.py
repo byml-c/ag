@@ -8,6 +8,7 @@ import traceback
 import subprocess
 from pathlib import Path
 from openai import OpenAI
+import argparse
 
 from thirdparty.rich.markdown import Markdown
 from thirdparty.rich.console import Console
@@ -24,6 +25,7 @@ ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
 CONFIG_FILE  = ROOT_DIR / "config.json"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
+SNAPS_DIR    = ROOT_DIR / ".agdata" / "snaps"
 
 
 # 自定义主题
@@ -193,6 +195,12 @@ class AIChat:
         with open(VARS_FILE, "w", encoding="utf-8") as f:
             json.dump(self.vars, f, indent=2, ensure_ascii=False)
 
+    def update_snap(self):
+        os.makedirs(SNAPS_DIR, exist_ok=True)
+        for sid in range(len(self.history['snap'])):
+            with open(SNAPS_DIR / f"{sid}", "w", encoding="utf-8") as f:
+                f.write(self.history['snap'][sid]['code'])
+
     def find_model(self, s:str):
         for model in self.config["models"]:
             if model["model"] == s:
@@ -206,14 +214,12 @@ class AIChat:
         """对话"""
         try:
             self.history['history'].append({"role": "user", "content": msg})
-            # response = self.client.chat.completions.create(
-            #     model=self.config["model"],
-            #     messages=self.history['history'],
-            #     temperature=self.config["temperature"],
-            #     stream=True
-            # )
-            import debug
-            response = debug.gen()
+            response = self.client.chat.completions.create(
+                model=self.config["model"],
+                messages=self.history['history'],
+                temperature=self.config["temperature"],
+                stream=True
+            )
 
             print(f"╭─  󱚣  {self.config['model']}")
             reasoning_content = ""
@@ -245,6 +251,7 @@ class AIChat:
                         answer_content += delta.content
                 markdown._end()
                 self.history['snap'] += markdown.code_list
+                self.update_snap()
             if is_reasoning or is_answering:
                 print()
             print('╰─────────────')
@@ -396,6 +403,7 @@ class AIChat:
             print("│   cls   : 清空屏幕，历史、变量均不会清空")
             print("│   forget: 清空历史，变量不会清空")
             print("│   change: 切换模型")
+            print("│   snap  : 查看代码片段")
             print("│   help  : 查看帮助")
             print("│   exit  : 退出")
             print("├─    终端命令")

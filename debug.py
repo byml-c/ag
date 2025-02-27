@@ -22,7 +22,7 @@ tt = [
 
 def gen():
     global tt
-    ct = str(tt[0])
+    ct = str(tt[1])
     while len(ct) > 0:
         time.sleep(0.05*random.random())
         l = random.randint(8, 18)
@@ -32,3 +32,9 @@ def gen():
         else:
             nt, ct = ct[:l], ct[l:]
             yield Chunk(nt)
+
+def main():
+    pass
+
+if __name__ == '__main__':
+    main()
