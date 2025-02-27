@@ -23,8 +23,9 @@ import readline
 # 配置文件路径
 ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
 CONFIG_FILE  = ROOT_DIR / "config.json"
-HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
+HISTORY_DIR  = ROOT_DIR / ".agdata" / "history"
+HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 SNAPS_DIR    = ROOT_DIR / ".agdata" / "snaps"
 
 
@@ -140,6 +141,7 @@ class AIChat:
             base_url=self.config["base_url"]
         )
         os.makedirs(ROOT_DIR / ".agdata", exist_ok=True)
+        self.hist_path = HISTORY_FILE
         self.history = self.load_history()
         self.vars = self.load_vars()
         
@@ -160,15 +162,18 @@ class AIChat:
             sys.exit(1)
         return config
 
-    def load_history(self):
+    def load_history(self, not_ok:bool=True):
         """加载对话历史"""
-        # if HISTORY_FILE.exists():
-        #     with open(HISTORY_FILE, encoding="utf-8") as f:
-        #         return json.load(f)
-        return {
-            'history': [],
-            'snap': []
-        }
+        if self.hist_path.exists():
+            with open(self.hist_path, encoding="utf-8") as f:
+                return json.load(f)
+        if not_ok:
+            return {
+                'history': [],
+                'snap': []
+            }
+        else:
+            raise FileNotFoundError("History file is not exist.")
     
     def load_vars(self):
         """加载变量"""
@@ -187,7 +192,8 @@ class AIChat:
 
     def save_history(self):
         """保存对话历史"""
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        os.makedirs(HISTORY_DIR, exist_ok=True)
+        with open(self.hist_path, "w", encoding="utf-8") as f:
             json.dump(self.history, f, indent=2, ensure_ascii=False)
     
     def save_vars(self):
@@ -267,10 +273,12 @@ class AIChat:
     
     def bash(self, cmd:str):
         start_time = time.time()
-        result = subprocess.run(
-            cmd, shell=True, check=True, text=True, capture_output=True)
-        cost_time = int((time.time() - start_time) * 1000)
-        return result.stdout.strip(), cost_time, result.returncode
+        try:
+            result = subprocess.run(
+                cmd, shell=True, check=True, text=True, capture_output=True)
+        finally:
+            cost_time = int((time.time() - start_time) * 1000)
+            return result.stdout.strip(), cost_time, result.returncode
 
     def short(self, s:str, l:int=30):
         """缩短字符串"""
@@ -317,12 +325,39 @@ class AIChat:
             print("╭─    再见")
             print("╰─  历史已保存。")
             return 'exit'
+        elif cmd == 'load':
+            print()
+            print("╭─    历史记录")
+            hist_files:list[Path] = []
+            if HISTORY_DIR.exists():
+                hist_files = list(HISTORY_DIR.iterdir())
+            for hid in range(len(hist_files)):
+                print(f"│   {hid:3}: [{hist_files[hid].name.replace('.json', '')}] ", end="")
+                with open(hist_files[hid], encoding="utf-8") as f:
+                    hist = json.load(f)
+                    if len(hist['history']) > 1:
+                        print(self.short(hist['history'][1]['content']), end='')
+                print()
+            print("├─────────────")
+            hist = input("│   请输入历史记录编号: ")
+            try:
+                hist = int(hist)
+                if hist >= 0 and hist < len(hist_files):
+                    self.hist_path = hist_files[hist]
+                    self.history = self.load_history(False)
+                    self.update_snap()
+                    print(f"╰─    成功切换到历史记录：{hist_files[hist].name.replace('.json', '')}")
+                else:
+                    raise Exception("Records is not exist.")
+            except:
+                print(f"╰─    历史记录不存在")
+            return 'done'
         elif cmd[:4] == 'bash':
             print()
             print(f"╭─    终端命令")
             try:
                 out, cost_time, returncode = self.bash(cmd[5:])
-                print(out, end="")
+                print(out)
                 print(f"╰─    执行结束，  {cost_time} ms, return {returncode}")
             except KeyboardInterrupt:
                 print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
@@ -402,6 +437,7 @@ class AIChat:
             print("├─    控制命令")
             print("│   cls   : 清空屏幕，历史、变量均不会清空")
             print("│   forget: 清空历史，变量不会清空")
+            print("│   load  : 加载历史")
             print("│   change: 切换模型")
             print("│   snap  : 查看代码片段")
             print("│   help  : 查看帮助")
@@ -442,15 +478,18 @@ class AIChat:
                 else:
                     self.chat(self.prase(user_input))
         except KeyboardInterrupt:
-            self.save_history()
             print()
             print("╭─    终止")
             print("╰─  退出程序")
         except Exception as _:
-            self.save_history()
             print()
             print(f"╭─    错误")
             print(f"╰─  {traceback.format_exc()}")
+        if len(self.history['history']) > 1:
+            if self.hist_path == HISTORY_FILE:
+                time_str = time.strftime(r"%Y-%m-%d_%H-%M-%S", time.localtime())
+                self.hist_path = HISTORY_DIR / f"{time_str}.json"
+            self.save_history()
 
 def main():
     ai = AIChat()
