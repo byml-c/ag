@@ -4,21 +4,14 @@ import re
 import sys
 import json
 import time
+import argparse
+import readline
 import traceback
 import subprocess
 from pathlib import Path
-from openai import OpenAI
-import argparse
 
-from thirdparty.rich.markdown import Markdown
-from thirdparty.rich.console import Console
-from thirdparty.rich.style import Style
-from thirdparty.rich.theme import Theme
-from thirdparty.rich.text import Text
-from thirdparty.rich.live import Live
-
-# 导入 readline 模块，用于支持上下键选择历史记录
-import readline
+from chat import Chat
+from deep import Deep
 
 # 配置文件路径
 ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
@@ -26,124 +19,17 @@ CONFIG_FILE  = ROOT_DIR / "config.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR  = ROOT_DIR / ".agdata" / "history"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
-SNIPPETS_DIR    = ROOT_DIR / ".agdata" / "snippets"
+SNIPPETS_DIR = ROOT_DIR / ".agdata" / "snippets"
 
-
-# 自定义主题
-custom_theme = Theme({
-    "markdown.block_quote": "#999999 on #1f1f1f",
-    "markdown.block_quote_border": "#d75f00",
-    "markdown.h1": "bold #1E90FF",
-    "markdown.h2": "bold #00BFFF",
-    "markdown.h3": "bold #87CEFA",
-    "markdown.h4": "bold #87CEEB",
-    "markdown.h5": "bold #E0FFFF",
-    "markdown.h6": "#E0FFFF",
-    "live.ellipsis": "#e6db74 on #272822"
-})
-console = Console(theme=custom_theme)
-
-class MDStreamRenderer:
-    def __init__(self, code_start:int):
-        self.md = None
-        self.live = None
-        self.code_start = code_start
-        self.code_list = []
-        self.content = ""
-    
-    def __enter__(self):
-        self._new()
-        self.code_list = []
-        return self
-    
-    def _new(self, text=''):
-        if self.md is not None:
-            self.live.__exit__(None, None, None)
-        self.content = text
-        self.live = Live(console=console, refresh_per_second=10)
-        self.live.__enter__()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if self.live is None:
-            return 
-        self.live.__exit__(exc_type, exc_value, traceback)
-
-    def _add_snippet(self, lang, code):
-        self.code_list.append({"lang": lang, "code": code})
-        cid = self.code_start+len(self.code_list)-1
-        console.print(Text(f'   snippet {cid}  ', justify='right', style="#e6db74 on #272822"),
-                      Text(f'', justify='right', style="#272822"), sep='')
-
-    def _end(self):
-        if self.md is not None and len(self.code_list) > 0:
-            c = self.md.parsed[-1]
-            if c.type == 'fence' and c.block:
-                self._add_snippet(c.info, c.content)
-
-    def _update(self, edl:str=''):
-        self.content += edl
-        try:
-            # 使用自定义主题的 Markdown
-            self.md = Markdown(
-                self.content, 
-                code_theme="monokai",
-                inline_code_lexer="text"
-            )
-            
-            c = self.md.parsed[-1]
-            if c.type == 'fence' and c.block:
-                if len(self.md.parsed) > 1:
-                    self.md.parsed.pop()
-                    last_pose = self.content.rfind('```')
-                    self.live.update(self.md, refresh=True)
-                    self._new(self.content[last_pose:])
-                else:
-                    self.live.update(self.md, refresh=True)
-            else:
-                c = self.md.parsed[0]
-                if c.type == 'fence' and c.block:
-                    code_end = self.content.rfind('```')
-                    if code_end != -1:
-                        self._add_snippet(c.info, c.content)
-                        self._new(self.content[code_end+3:])
-                else:
-                    self.live.update(self.md, refresh=True)
-                    if edl == '\n\n':
-                        self._new()
-                        console.print()
-        except:
-            self.live.update(Text(self.content), refresh=True)
-
-    def update(self, chunk:str):
-        chunk = re.sub(r"\n{2,}", "\n\n", chunk)
-        length, i = len(chunk), 0
-        while i < length:
-            if chunk[i] == '\n':
-                if i+1 < length and chunk[i+1] == '\n':
-                    self._update('\n\n')
-                    i = i+1
-                else:
-                    self._update('\n')
-            else:
-                self.content += chunk[i]
-            i += 1
-        if self.content != "":
-            self._update()
-
-class AIChat:
+class Agent:
     def __init__(self):
         self.config = self.load_config()
-        os.environ['all_proxy'] = ''
-        os.environ['http_proxy'] = ''
-        os.environ['https_proxy'] = ''
-        self.client = OpenAI(
-            api_key=self.config["api_key"],
-            base_url=self.config["base_url"]
-        )
         os.makedirs(ROOT_DIR / ".agdata", exist_ok=True)
         self.hist_path = HISTORY_FILE
         self.history = self.load_history()
         self.vars = self.load_vars()
+        self.chat = Chat(self.config["api_key"], self.config["base_url"])
+        self.deep = Deep(self.config["api_key"], self.config["base_url"])
         
         # 初始化系统提示
         if not any(msg["role"] == "system" for msg in self.history['history']):
@@ -219,95 +105,6 @@ class AIChat:
     
     def get_user(self):
         return os.getenv("USER")
-
-    def _render_response(self, response):
-        reasoning_content, answer_content = "", ""
-        is_reasoning, is_answering = False, False
-        with MDStreamRenderer(len(self.history['snippet'])) as markdown:
-            for chunk in response:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                # 打印思考过程
-                if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
-                    if delta.reasoning_content != "" and is_reasoning == False:
-                        print("├─  󰟷  THINK", flush=True)
-                        markdown.update('> ')
-                        is_reasoning = True
-                    markdown.update(delta.reasoning_content.replace('\n', '\n\n> '))
-                    reasoning_content += delta.reasoning_content
-                else:
-                    # 开始回复
-                    if delta.content != "" and is_answering == False:
-                        if is_reasoning:
-                            markdown._new()
-                            print()
-                        print("├─  󰛩  ANSWER", flush=True)
-                        is_answering = True
-                    # 打印回复过程
-                    markdown.update(delta.content)
-                    answer_content += delta.content
-            markdown._end()
-            self.history['snippet'] += markdown.code_list
-            self.update_snippet()
-        if is_reasoning or is_answering:
-            print()
-        return reasoning_content, answer_content
-    
-    def _render_history(self):
-        class Delta:
-            def __init__(self, c, r):
-                if r:
-                    self.reasoning_content = c
-                else:
-                    self.content = c
-        class Choice:
-            def __init__(self, c, r):
-                self.delta = Delta(c, r)
-        class Chunk:
-            def __init__(self, text, reasoning=False):
-                self.choices = [
-                    Choice(text, reasoning)
-                ]
-        def gen(s:str, batch:int=100):
-            for i in range(0, len(s), batch):
-                yield Chunk(s[i:i+batch])
-
-        for item in self.history['history']:
-            if item['role'] == 'user':
-                print(f"╭─  󱋊  User")
-                print(f"╰─  {item['content']}")
-            elif item['role'] == 'assistant':
-                print(f"╭─  󱚣  Model")
-                try:
-                    _1, _2 = self._render_response(gen(item['content']))
-                except:
-                    print(traceback.format_exc())
-                print(f'╰─────────────')
-
-    def chat(self, msg:str):
-        """对话"""
-        try:
-            self.history['history'].append({"role": "user", "content": msg})
-            response = self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=self.history['history'],
-                temperature=self.config["temperature"],
-                stream=True
-            )
-
-            print(f"╭─  󱚣  {self.config['model']}")
-            _, answer_content = self._render_response(response)
-            print('╰─────────────')
-            self.history['history'].append({
-                "role": "assistant",
-                "content": answer_content
-            })
-        except KeyboardInterrupt:
-            self.save_history()
-            print()
-            print("╭─    中断")
-            print("╰─  本轮对话已停止。")
     
     def bash(self, cmd:str):
         start_time = time.time()
@@ -387,11 +184,10 @@ class AIChat:
                     record = input("├─  是否需要打印历史记录？[y/n]: ").lower()
                     if record == 'y':
                         self.command('clear')
-                        self.history['snippet'] = []
-                        self._render_history()
+                        self.chat._render_history(self.history)
                     else:
-                        self.update_snippet()
                         print(f"╰─────────────")
+                    self.update_snippet()
                 else:
                     raise Exception("Records is not exist.")
             except:
@@ -510,18 +306,70 @@ class AIChat:
         ipt = re.sub(r"{(.*?)}", replace_var, ipt)
         return ipt
 
+    @staticmethod
+    def input_lines(prompt):
+        content = ''
+        print(prompt, end='')
+        while True:
+            line = input()
+            if line.strip().endswith('\\'):
+                content += line[:-1] + '\n'
+            else:
+                break
+        return content + line
+
     def main(self):
         """执行对话"""
         try:
             user_name = self.get_user()
             while True:
-                user_input = input(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
+                user_input = self.input_lines(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
                 if len(user_input) > 0 and user_input[0] == '/':
                     ret = self.command(user_input[1:])
                     if ret == 'exit':
                         break
                 else:
-                    self.chat(self.prase(user_input))
+                    self.deep_solve = True
+                    if self.deep_solve:
+                        self.history['history'][0]['content'] = '''
+你是一个智能助手，拥有调用工具的能力，可以帮助用户解决遇到的问题。
+
+当你需要调用工具时，你需要**只以 JSON 格式输出一个数组**，数组中的每个元素是一个字典，取值为以下两种：
+1. `{"name": "python", "code": ""}` 表示调用 Python 执行代码，`code` 为 Python 代码字符串。
+2. `{"name": "bash", "code": ""}` 表示调用 Bash 执行代码，`code` 为 Bash 代码字符串。
+如果执行成功，你将会在下一次输入时得到调用代码的 stdout 结果，否则，你将收到 stderr 的结果。
+
+比如：
+用户提问：请介绍一下我的 Python 版本。
+你的输出：
+```json
+[{"name": "bash", "code": "python3 --version"}]
+```
+用户返回：[{"name": "bash", "code": "python3 --version", "stdout": "Python 3.12.7\n"}]
+
+然后，你可以正常回答用户的问题。
+注意，只有在你以 ```json ... ``` 格式输出时，才会调用工具。否则，你并不会收到调用工具的结果。
+所以，当你希望调用工具时，**请不要有任何其他的输出和提示**。
+
+你需要合理思考，灵活运用工具，帮助用户解决遇到的问题！
+'''
+
+                        msg = self.prase(user_input)
+                        for _ in range(20):
+                            status, cmd, _ = self.deep.chat(
+                                msg=msg,
+                                history=self.history,
+                                model=self.config["model"]
+                            )
+                            if status == 'exec':
+                                msg = cmd
+                            else: break
+                    else:
+                        status, _ = self.chat.chat(
+                            msg=self.prase(user_input),
+                            history=self.history,
+                            model=self.config["model"]
+                        )
         except KeyboardInterrupt:
             print()
             print("╭─    终止")
@@ -538,7 +386,7 @@ class AIChat:
             self.save_history()
 
 def main():
-    ai = AIChat()
+    ai = Agent()
     ai.main()
     return
 
