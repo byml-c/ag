@@ -299,7 +299,7 @@ class AIChat:
                 stream=True,
             )
 
-            print(f"╭─  󱚣  {self.config['model']}")
+            print(f"╭─  󱚣  {self.config['model'][:11]}")
             _, answer_content = self._render_response(response)
             print("╰─────────────")
             self.history["history"].append(
