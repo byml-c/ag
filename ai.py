@@ -8,7 +8,8 @@ import traceback
 import subprocess
 from pathlib import Path
 from openai import OpenAI
-import argparse
+
+# import argparse
 
 from thirdparty.rich.markdown import Markdown
 from thirdparty.rich.console import Console
@@ -21,7 +22,7 @@ from thirdparty.rich.live import Live
 # import readline
 
 # 配置文件路径
-ROOT_DIR = Path("PATH_TO_AG")
+ROOT_DIR = Path(r"D:\\Programming\\ag")
 CONFIG_FILE = ROOT_DIR / "config.json"
 VARS_FILE = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR = ROOT_DIR / ".agdata" / "history"
@@ -157,7 +158,7 @@ class AIChat:
 
     @staticmethod
     def load_config():
-        with open(CONFIG_FILE, encoding="utf-8") as f:
+        with open(CONFIG_FILE, encoding="gbk") as f:
             config = json.load(f)
 
         if config["api_key"] == "":
@@ -168,7 +169,7 @@ class AIChat:
     def load_history(self, not_ok: bool = True):
         """加载对话历史"""
         if self.hist_path.exists():
-            with open(self.hist_path, encoding="utf-8") as f:
+            with open(self.hist_path, encoding="gbk") as f:
                 return json.load(f)
         if not_ok:
             return {"history": [], "snap": []}
@@ -178,32 +179,32 @@ class AIChat:
     def load_vars(self):
         """加载变量"""
         if VARS_FILE.exists():
-            with open(VARS_FILE, encoding="utf-8") as f:
+            with open(VARS_FILE, encoding="gbk") as f:
                 return json.load(f)
         return {"users": {}, "bash": {}}
 
     def save_config(self):
         """保存配置"""
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(CONFIG_FILE, "w", encoding="gbk") as f:
             json.dump(self.config, f, indent=2, ensure_ascii=False)
 
     def save_history(self):
         """保存对话历史"""
         os.makedirs(HISTORY_DIR, exist_ok=True)
-        with open(self.hist_path, "w", encoding="utf-8") as f:
+        with open(self.hist_path, "w", encoding="gbk") as f:
             json.dump(self.history, f, indent=2, ensure_ascii=False)
 
     def save_vars(self):
         """保存变量"""
-        with open(VARS_FILE, "w", encoding="utf-8") as f:
+        with open(VARS_FILE, "w", encoding="gbk") as f:
             json.dump(self.vars, f, indent=2, ensure_ascii=False)
 
     def update_snap(self):
         os.makedirs(SNAPS_DIR, exist_ok=True)
-        os.system(f'rm {SNAPS_DIR / "*"}')
+        # os.system(f"del {SNAPS_DIR}\\*")  # 切换历史记录时清空代码片段
         for sid in range(len(self.history["snap"])):
             os.environ[f"S{sid}"] = str(SNAPS_DIR / f"{sid}")
-            with open(SNAPS_DIR / f"{sid}", "w", encoding="utf-8") as f:
+            with open(SNAPS_DIR / f"{sid}", "w", encoding="gbk") as f:
                 f.write(self.history["snap"][sid]["code"])
 
     def find_model(self, s: str):
@@ -216,7 +217,7 @@ class AIChat:
         return None
 
     def get_user(self):
-        return os.getenv("USER")
+        return os.getenv("USERNAME")
 
     def _render_response(self, response):
         reasoning_content, answer_content = "", ""
@@ -312,6 +313,10 @@ class AIChat:
 
     def bash(self, cmd: str):
         start_time = time.time()
+        import re
+
+        cmd = re.sub(r"\$(.*) ?", r"%\1% ", cmd)
+        print("DEBUG: ", cmd)
         try:
             result = subprocess.run(
                 cmd, shell=True, check=True, text=True, capture_output=True
@@ -376,7 +381,7 @@ class AIChat:
                     f"│   {hid:3}: [{hist_files[hid].name.replace('.json', '')}] ",
                     end="",
                 )
-                with open(hist_files[hid], encoding="utf-8") as f:
+                with open(hist_files[hid], encoding="gbk") as f:
                     hist = json.load(f)
                     if len(hist["history"]) > 1:
                         print(self.short(hist["history"][1]["content"]), end="")

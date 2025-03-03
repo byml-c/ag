@@ -1,7 +1,7 @@
 Write-Host "Setting up the working directory"
 $ROOT_DIR = Get-Location
-$ROOT_DIR_R = $ROOT_DIR -replace '[\, /, \\]', '\\\\'
-$ROOT_DIR_REX = "(ROOT_DIR = Path\(`")PATH_TO_AG(`"\))", "`$1$ROOT_DIR_R`$2"
+$ROOT_DIR_R = $ROOT_DIR -replace '[\, /, \\]', '\\'
+$ROOT_DIR_REX = "(ROOT_DIR = Path\().*(\))", "`$1r`"$ROOT_DIR_R`"`$2"
 (Get-Content ai.py) -replace $ROOT_DIR_REX | Set-Content ai.py
 
 if (Test-Path -Path "config.json") {
