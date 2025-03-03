@@ -1,4 +1,4 @@
-# Shell-Agent
+# Shell-Agent(Windows)
 
 ## Introduction
 
@@ -22,7 +22,7 @@
 ![运行示例](./img/OS2.png)
 
 ## Requirements
-- Linux 系统
+- Windows 系统
 - Python 3.10+
 
 ## Installation
@@ -30,6 +30,7 @@
 1. 下载代码至本地
 2. 配置 Python 运行环境，确保终端中 `python` 可以进入 Python 交互式界面
 3. 安装 OpenAI 包 `pip install openai`
+4. 安装必要的渲染包 `pip install markdown-it-py rich`
 4. 在终端中运行安装脚本 `bash install.sh`，根据提示完成安装
 
 ## Usage
