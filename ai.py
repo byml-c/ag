@@ -26,7 +26,7 @@ CONFIG_FILE  = ROOT_DIR / "config.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR  = ROOT_DIR / ".agdata" / "history"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
-SNAPS_DIR    = ROOT_DIR / ".agdata" / "snaps"
+SNIPPETS_DIR    = ROOT_DIR / ".agdata" / "snippets"
 
 
 # 自定义主题
@@ -68,17 +68,17 @@ class MDStreamRenderer:
             return 
         self.live.__exit__(exc_type, exc_value, traceback)
 
-    def _add_snap(self, lang, code):
+    def _add_snippet(self, lang, code):
         self.code_list.append({"lang": lang, "code": code})
         cid = self.code_start+len(self.code_list)-1
-        console.print(Text(f'   snap {cid}  ', justify='right', style="#e6db74 on #272822"),
+        console.print(Text(f'   snippet {cid}  ', justify='right', style="#e6db74 on #272822"),
                       Text(f'', justify='right', style="#272822"), sep='')
 
     def _end(self):
         if self.md is not None and len(self.code_list) > 0:
             c = self.md.parsed[-1]
             if c.type == 'fence' and c.block:
-                self._add_snap(c.info, c.content)
+                self._add_snippet(c.info, c.content)
 
     def _update(self, edl:str=''):
         self.content += edl
@@ -104,7 +104,7 @@ class MDStreamRenderer:
                 if c.type == 'fence' and c.block:
                     code_end = self.content.rfind('```')
                     if code_end != -1:
-                        self._add_snap(c.info, c.content)
+                        self._add_snippet(c.info, c.content)
                         self._new(self.content[code_end+3:])
                 else:
                     self.live.update(self.md, refresh=True)
@@ -170,7 +170,7 @@ class AIChat:
         if not_ok:
             return {
                 'history': [],
-                'snap': []
+                'snippet': []
             }
         else:
             raise FileNotFoundError("History file is not exist.")
@@ -201,13 +201,12 @@ class AIChat:
         with open(VARS_FILE, "w", encoding="utf-8") as f:
             json.dump(self.vars, f, indent=2, ensure_ascii=False)
 
-    def update_snap(self):
-        os.makedirs(SNAPS_DIR, exist_ok=True)
-        os.system(f'rm {SNAPS_DIR / "*"}')
-        for sid in range(len(self.history['snap'])):
-            os.environ[f'S{sid}'] = str(SNAPS_DIR / f"{sid}")
-            with open(SNAPS_DIR / f"{sid}", "w", encoding="utf-8") as f:
-                f.write(self.history['snap'][sid]['code'])
+    def update_snippet(self):
+        os.makedirs(SNIPPETS_DIR, exist_ok=True)
+        for sid in range(len(self.history['snippet'])):
+            os.environ[f'S{sid}'] = str(SNIPPETS_DIR / f"{sid}")
+            with open(SNIPPETS_DIR / f"{sid}", "w", encoding="utf-8") as f:
+                f.write(self.history['snippet'][sid]['code'])
 
     def find_model(self, s:str):
         for model in self.config["models"]:
@@ -224,7 +223,7 @@ class AIChat:
     def _render_response(self, response):
         reasoning_content, answer_content = "", ""
         is_reasoning, is_answering = False, False
-        with MDStreamRenderer(len(self.history['snap'])) as markdown:
+        with MDStreamRenderer(len(self.history['snippet'])) as markdown:
             for chunk in response:
                 if not chunk.choices:
                     continue
@@ -235,7 +234,7 @@ class AIChat:
                         print("├─  󰟷  THINK", flush=True)
                         markdown.update('> ')
                         is_reasoning = True
-                    markdown.update(delta.reasoning_content.replace('\n', '\n> '))
+                    markdown.update(delta.reasoning_content.replace('\n', '\n\n> '))
                     reasoning_content += delta.reasoning_content
                 else:
                     # 开始回复
@@ -249,12 +248,12 @@ class AIChat:
                     markdown.update(delta.content)
                     answer_content += delta.content
             markdown._end()
-            self.history['snap'] += markdown.code_list
-            self.update_snap()
+            self.history['snippet'] += markdown.code_list
+            self.update_snippet()
         if is_reasoning or is_answering:
             print()
         return reasoning_content, answer_content
-
+    
     def _render_history(self):
         class Delta:
             def __init__(self, c, r):
@@ -353,7 +352,7 @@ class AIChat:
             return 'done'
         elif cmd == 'forget':
             self.history['history'] = [self.history['history'][0]]
-            self.history['snap'] = []
+            self.history['snippet'] = []
             print()
             print("╭─    清空历史")
             print("╰─  历史已清空。")
@@ -388,10 +387,10 @@ class AIChat:
                     record = input("├─  是否需要打印历史记录？[y/n]: ").lower()
                     if record == 'y':
                         self.command('clear')
-                        self.history['snap'] = []
+                        self.history['snippet'] = []
                         self._render_history()
                     else:
-                        self.update_snap()
+                        self.update_snippet()
                         print(f"╰─────────────")
                 else:
                     raise Exception("Records is not exist.")
@@ -462,14 +461,14 @@ class AIChat:
                     print(f"│   {k:10} = {v!r}")
             print("╰─────────────")
             return 'done'
-        elif cmd[:4] == 'snap':
+        elif cmd[:4] == 'snippet':
             print()
             print(f"╭─    代码列表")
             cmd = cmd[5:].strip()
-            for sid in range(len(self.history['snap'])):
-                snap = self.history['snap'][sid]
-                if cmd == '' or snap['lang'] == cmd:
-                    print(f"│   $S{sid:<3} [{snap['lang']:10}]: {self.short(snap['code'])!r}")
+            for sid in range(len(self.history['snippet'])):
+                snippet = self.history['snippet'][sid]
+                if cmd == '' or snippet['lang'] == cmd:
+                    print(f"│   $S{sid:<3} [{snippet['lang']:10}]: {self.short(snippet['code'])!r}")
             print("╰─────────────")
             return 'done'
         else:
@@ -485,7 +484,7 @@ class AIChat:
             print("│   forget: 清空历史，变量不会清空")
             print("│   load  : 加载历史")
             print("│   change: 切换模型")
-            print("│   snap  : 查看代码片段")
+            print("│   snippet  : 查看代码片段")
             print("│   help  : 查看帮助")
             print("│   exit  : 退出")
             print("├─    终端命令")
