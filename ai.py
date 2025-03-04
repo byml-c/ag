@@ -316,7 +316,7 @@ class AIChat:
         import re
 
         cmd = re.sub(r"\$(.*) ?", r"%\1% ", cmd)
-        print("DEBUG: ", cmd) if self.config["debug"] else None
+        # print("DEBUG: ", cmd)
         try:
             result = subprocess.run(
                 cmd, shell=True, check=True, text=True, capture_output=True
