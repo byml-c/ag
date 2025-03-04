@@ -28,15 +28,16 @@ class Agent:
         self.hist_path = HISTORY_FILE
         self.history = self.load_history()
         self.vars = self.load_vars()
+
         self.chat = Chat(self.config["api_key"], self.config["base_url"])
         self.deep = Deep(self.config["api_key"], self.config["base_url"])
         
         # 初始化系统提示
-        if not any(msg["role"] == "system" for msg in self.history['history']):
-            self.history['history'].insert(0, {
-                "role": "system",
-                "content": self.config["system_prompt"]
-            })
+        self.history['history'].insert(0, {
+            "role": "system",
+            "content": self.config["deep_prompt"] \
+                if self.config["deep"] else self.config["chat_prompt"]
+        })
     
     @staticmethod
     def load_config():
@@ -193,6 +194,13 @@ class Agent:
             except:
                 print(f"╰─    历史记录不存在")
             return 'done'
+        elif cmd == 'chat':
+            print()
+            print(f"╭─  󰧑  切换对话模式")
+            self.config['deep'] = not self.config['deep']
+            self.save_config()
+            print(f"╰─  已切换到{'深度对话' if self.config['deep'] else '普通对话'}")
+            return 'done'
         elif cmd[:4] == 'bash':
             print()
             print(f"╭─    终端命令")
@@ -280,6 +288,7 @@ class Agent:
             print("│   forget: 清空历史，变量不会清空")
             print("│   load  : 加载历史")
             print("│   change: 切换模型")
+            print("│   chat  : 切换到{}".format("深度对话" if self.config['deep'] else "普通对话"))
             print("│   snippet  : 查看代码片段")
             print("│   help  : 查看帮助")
             print("│   exit  : 退出")
@@ -323,36 +332,15 @@ class Agent:
         try:
             user_name = self.get_user()
             while True:
-                user_input = self.input_lines(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
+                print(f'\n╭─  󱋊 {user_name}')
+                user_input = self.input_lines(f"╰─  ").strip()
                 if len(user_input) > 0 and user_input[0] == '/':
                     ret = self.command(user_input[1:])
                     if ret == 'exit':
                         break
                 else:
-                    self.deep_solve = True
-                    if self.deep_solve:
-                        self.history['history'][0]['content'] = '''
-你是一个智能助手，拥有调用工具的能力，可以帮助用户解决遇到的问题。
-
-当你需要调用工具时，你需要**只以 JSON 格式输出一个数组**，数组中的每个元素是一个字典，取值为以下两种：
-1. `{"name": "python", "code": ""}` 表示调用 Python 执行代码，`code` 为 Python 代码字符串。
-2. `{"name": "bash", "code": ""}` 表示调用 Bash 执行代码，`code` 为 Bash 代码字符串。
-如果执行成功，你将会在下一次输入时得到调用代码的 stdout 结果，否则，你将收到 stderr 的结果。
-
-比如：
-用户提问：请介绍一下我的 Python 版本。
-你的输出：
-```json
-[{"name": "bash", "code": "python3 --version"}]
-```
-用户返回：[{"name": "bash", "code": "python3 --version", "stdout": "Python 3.12.7\n"}]
-
-然后，你可以正常回答用户的问题。
-注意，只有在你以 ```json ... ``` 格式输出时，才会调用工具。否则，你并不会收到调用工具的结果。
-所以，当你希望调用工具时，**请不要有任何其他的输出和提示**。
-
-你需要合理思考，灵活运用工具，帮助用户解决遇到的问题！
-'''
+                    if self.config['deep']:
+                        self.history['history'][0]['content'] = self.config['deep_prompt']
 
                         msg = self.prase(user_input)
                         for _ in range(20):
