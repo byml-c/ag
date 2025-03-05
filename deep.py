@@ -9,46 +9,6 @@ from render import MDStreamRenderer
 from chat import Chat
 
 class Deep(Chat):
-    def _render_response(self, response, history:dict[str, list]=None):
-        if history is None:
-            history = { "snippet": [], "history": [] }
-        reasoning_content, answer_content = "", ""
-        is_reasoning, is_answering = False, False
-
-        with MDStreamRenderer(len(history['snippet'])) as markdown:
-            for chunk in response:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta
-                # 打印思考过程
-                if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
-                    if delta.reasoning_content != "" and is_reasoning == False:
-                        print("├─  󰟷  THINK", flush=True)
-                        markdown.update('> ')
-                        is_reasoning = True
-                    markdown.update(re.sub(r'\n+', '\n> ', delta.reasoning_content))
-                    reasoning_content += delta.reasoning_content
-                else:
-                    # 开始回复
-                    if delta.content != "" and is_answering == False:
-                        if is_reasoning:
-                            markdown._new()
-                            print()
-                        print("├─  󰛩  ANSWER", flush=True)
-                        is_answering = True
-                    # 打印回复过程
-                    markdown.update(delta.content)
-                    answer_content += delta.content
-            markdown._end()
-            history['snippet'] += markdown.code_list
-        if is_reasoning or is_answering:
-            print()
-        history['history'].append({
-            "role": "assistant",
-            "content": answer_content
-        })
-        return history, reasoning_content
-    
     def _check_parse(self, s:str):
         commands = []
         s = re.search(r'^(.*?)```(.*?)\n(.*)\n```(.*?)$', 
@@ -79,7 +39,7 @@ class Deep(Chat):
             if cmd['name'] == 'python':
                 if 'code' not in cmd:
                     raise Exception("Invalid Python call format")
-                ret = subprocess.run(['python3', '-cmd', cmd['code']], capture_output=True)
+                ret = subprocess.run(['python3', '-c', cmd['code']], capture_output=True)
                 if ret.returncode == 0:
                     res = { "stdout": ret.stdout.decode('utf-8') }
                 else:
@@ -91,14 +51,17 @@ class Deep(Chat):
                 if ret.returncode == 0:
                     res = { "stdout": ret.stdout.decode('utf-8') }
                 else:
-                    res = { "stderr": ret.stderr.decode('utf-8') }
+                    res = { "stderr": ret.stderr.decode('utf-8'), "exitcode": ret.returncode }
             cmd.update(res)
         return commands
 
-    def chat(self, msg:str, history:dict[str, list], model:str, temperature:float=0.7):
-        """对话"""
+    def chat(self, user:str, msg:str, history:dict[str, list], model:str, temperature:float=0.7, run:bool=False):
+        """对话，会修改传入的历史记录"""
         try:
-            history['history'].append({"role": "user", "content": msg})
+            history['history'].append({
+                "role": "user", "content": msg,
+                "metadata": { "user": user, "run": run, "deep": True }
+            })
             response = self.client.chat.completions.create(
                 model=model,
                 messages=history['history'],
@@ -107,8 +70,14 @@ class Deep(Chat):
             )
 
             print(f"╭─  󱚣  {model}")
-            hist, _ = self._render_response(response, history)
-            commands = self._check_parse(hist['history'][-1]['content'])
+            result = self._render_response(response, len(history['snippet']))
+            history['snippet'] += result['snippets']
+            history['history'].append({
+                "role": "assistant", "content": result['answer'],
+                "metadata": { "model": model }
+            })
+
+            commands = self._check_parse(result['answer'])
             if commands is None:
                 print('╰─────────────')
                 return 'finish', '', history
@@ -120,10 +89,10 @@ class Deep(Chat):
                 for cmd in commands:
                     print(f'[{cmd["name"]}] {cmd["code"]!r}', end='')
                     if 'stdout' in cmd:
-                        print(f' -> stdout')
+                        print(f' -> stdout[ExitCode: 0]')
                         print(cmd['stdout'])
                     if 'stderr' in cmd:
-                        print(f' -> stderr')
+                        print(f' -> stderr[ExitCode: {cmd["exitcode"]}]')
                         print(cmd['stderr'])
                 print('╰─────────────')
                 return 'exec', content, history

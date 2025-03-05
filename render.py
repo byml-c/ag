@@ -1,12 +1,14 @@
 import os
 import re
+import sys
+sys.path.insert(0, './thirdparty')
 
-from thirdparty.rich.markdown import Markdown
-from thirdparty.rich.console import Console
-from thirdparty.rich.style import Style
-from thirdparty.rich.theme import Theme
-from thirdparty.rich.text import Text
-from thirdparty.rich.live import Live
+from rich.markdown import Markdown
+from rich.console import Console
+from rich.style import Style
+from rich.theme import Theme
+from rich.text import Text
+from rich.live import Live
 
 # 自定义主题
 custom_theme = Theme({
@@ -28,7 +30,7 @@ class MDStreamRenderer:
         self.live = None
         self.code_start = code_start
         self.code_list = []
-        self.content = ""
+        self.buffer = ""
     
     def __enter__(self):
         self._new()
@@ -38,7 +40,7 @@ class MDStreamRenderer:
     def _new(self, text=''):
         if self.md is not None:
             self.live.__exit__(None, None, None)
-        self.content = text
+        self.buffer = text
         self.live = Live(console=console, refresh_per_second=10)
         self.live.__enter__()
 
@@ -49,65 +51,52 @@ class MDStreamRenderer:
 
     def _add_snippet(self, lang, code):
         self.code_list.append({"lang": lang, "code": code})
-        cid = self.code_start+len(self.code_list)-1
-        console.print(Text(f'   snippet {cid}  ', justify='right', style="#e6db74 on #272822"),
-                      Text(f'', justify='right', style="#272822"), sep='')
+        sid = self.code_start+len(self.code_list)-1
+        console.print(
+            Text(f'   snippet {sid}  ', justify='left', style="#e6db74 on #272822"),
+            Text(f'', justify='left', style="#272822"), sep="")
 
-    def _end(self):
-        if self.md is not None and len(self.code_list) > 0:
-            c = self.md.parsed[-1]
-            if c.type == 'fence' and c.block:
-                self._add_snippet(c.info, c.content)
-
-    def _update(self, edl:str=''):
-        self.content += edl
+    def _update(self, edl:str='', reasoning:bool=False):
+        def _new_md(buffer:str):
+            return Markdown(buffer, code_theme="monokai", inline_code_lexer="text")
+        
+        self.buffer += edl
         try:
-            # 使用自定义主题的 Markdown
-            self.md = Markdown(
-                self.content, 
-                code_theme="monokai",
-                inline_code_lexer="text"
-            )
-            c = self.md.parsed[-1]
-            if c.type == 'fence' and c.block:
-                if len(self.md.parsed) > 1:
-                    self.md.parsed.pop()
-                    last_pose = self.content.rfind('```')
-                    self.live.update(self.md, refresh=True)
-                    self._new(self.content[last_pose:])
-                else:
-                    self.live.update(self.md, refresh=True)
-            elif c.type == 'blockquote_close':
+            last_pose = self.buffer.rfind('```')
+            if last_pose == -1:
+                self.md = _new_md(self.buffer)
                 self.live.update(self.md, refresh=True)
-                if edl == '\n':
+                if edl == '\n\n' or (edl == '\n' and reasoning):
                     self._new()
             else:
-                c = self.md.parsed[0]
-                if c.type == 'fence' and c.block:
-                    code_end = self.content.rfind('```')
-                    if code_end != -1:
-                        self._add_snippet(c.info, c.content)
-                        self._new(self.content[code_end+3:])
-                else:
+                if self.buffer[:3] == '```':
+                    self.md = _new_md(self.buffer)
+                    code = self.md.parsed[-1]
                     self.live.update(self.md, refresh=True)
-                    if edl == '\n\n':
-                        self._new()
-                        console.print()
+                    if last_pose != 0:
+                        self._add_snippet(code.info, code.content)
+                        self._new(self.buffer[last_pose+3:])
+                else:
+                    self.md = _new_md(self.buffer[:last_pose])
+                    self.live.update(self.md, refresh=True)
+                    self._new(self.buffer[last_pose:])
         except:
-            self.live.update(Text(self.content), refresh=True)
+            self.live.update(Text(self.buffer), refresh=True)
 
-    def update(self, chunk:str):
+    def update(self, chunk:str, reasoning:bool=False):
         chunk = re.sub(r"\n{2,}", "\n\n", chunk)
-        length, i = len(chunk), 0
+        length, i, newline = len(chunk), 0, False
         while i < length:
             if chunk[i] == '\n':
+                newline = False
                 if i+1 < length and chunk[i+1] == '\n':
                     self._update('\n\n')
                     i = i+1
                 else:
-                    self._update('\n')
+                    self._update('\n', reasoning)
             else:
-                self.content += chunk[i]
+                newline = True
+                self.buffer += chunk[i]
             i += 1
-        if self.content != "":
+        if newline:
             self._update()
