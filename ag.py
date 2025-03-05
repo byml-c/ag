@@ -5,7 +5,8 @@ import sys
 import json
 import time
 import argparse
-import readline
+
+# import readline
 import traceback
 import subprocess
 from pathlib import Path
@@ -98,7 +99,7 @@ class Agent:
         return None
 
     def get_user(self):
-        return os.getenv("USER")
+        return os.getenv("USERNAME")
 
     def bash(self, cmd: str):
         start_time = time.time()
