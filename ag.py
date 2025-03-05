@@ -15,7 +15,7 @@ from chat import Chat
 from deep import Deep
 
 # 配置文件路径
-ROOT_DIR = Path(r"D:\\Programming\\ag")
+ROOT_DIR = Path(r"E:\\Programing\\ag")
 CONFIG_FILE = ROOT_DIR / "config.json"
 VARS_FILE = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR = ROOT_DIR / ".agdata" / "history"
@@ -346,7 +346,7 @@ class Agent:
                         self.history["history"][0][
                             "content"
                         ] = """
-你是一个智能助手，拥有调用工具的能力，可以帮助用户解决遇到的问题。
+你是一个智能助手，拥有调用工具的能力，可以帮助用户解决遇到的问题。无论用户使用什么语言, 请你都用中文回答
 
 当你需要调用工具时，你需要**只以 JSON 格式输出一个数组**，数组中的每个元素是一个字典，取值为以下两种：
 1. `{"name": "python", "code": ""}` 表示调用 Python 执行代码，`code` 为 Python 代码字符串。

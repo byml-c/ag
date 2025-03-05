@@ -110,7 +110,7 @@ class Deep(Chat):
                 stream=True,
             )
 
-            print(f"╭─  󱚣  {model}")
+            print(f"╭─  󱚣  {model[:11]}")
             hist, _ = self._render_response(response, history)
             commands = self._check_parse(hist["history"][-1]["content"])
             if commands is None:
