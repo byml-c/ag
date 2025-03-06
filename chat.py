@@ -99,7 +99,7 @@ class Chat:
                 except:
                     print(traceback.format_exc())
                 print(f'╰─────────────')
-        return history
+        return history, snippet
     
     def chat(self, user:str, msg:str, history:dict[str, list], model:str, temperature:float=0.7):
         """对话，会修改传入的历史记录"""

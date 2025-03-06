@@ -1,7 +1,7 @@
 import os
 import re
-import sys
-sys.path.insert(0, './thirdparty')
+
+from _global import *
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -29,7 +29,6 @@ class MDStreamRenderer:
         self.md = None
         self.live = None
         self.code_start = code_start
-        self.code_list = []
         self.buffer = ""
     
     def __enter__(self):
@@ -38,7 +37,14 @@ class MDStreamRenderer:
         return self
     
     def _new(self, text=''):
+        self.code_pose, self.code_in = -1, False
         if self.md is not None:
+            # 添加 snippet
+            for elem in self.md.parsed:
+                if elem.type == 'fence' and elem.block:
+                    elem.meta.update({
+                        "sid": self._add_snippet(elem.info, elem.content)})
+            self.live.update(self.md)
             self.live.__exit__(None, None, None)
         self.buffer = text
         self.live = Live(console=console, refresh_per_second=10)
@@ -51,40 +57,37 @@ class MDStreamRenderer:
 
     def _add_snippet(self, lang, code):
         self.code_list.append({"lang": lang, "code": code})
-        sid = self.code_start+len(self.code_list)-1
-        console.print(
-            Text(f'   snippet {sid}  ', justify='left', style="#e6db74 on #272822"),
-            Text(f'', justify='left', style="#272822"), sep="")
-
+        return self.code_start+len(self.code_list)-1
+        
     def _update(self, edl:str='', reasoning:bool=False):
         def _new_md(buffer:str):
             return Markdown(buffer, code_theme="monokai", inline_code_lexer="text")
-        
+
         self.buffer += edl
         try:
-            last_pose = self.buffer.rfind('```')
-            if last_pose == -1:
-                self.md = _new_md(self.buffer)
-                self.live.update(self.md, refresh=True)
-                if edl == '\n\n' or (edl == '\n' and reasoning):
-                    self._new()
+            new_pose = self.buffer.rfind('```')
+            self.md = _new_md(self.buffer)
+            self.live.update(self.md, refresh=True)
+            if self.code_in:
+                if new_pose != self.code_pose:
+                    self.code_in = False
+                    self.code_pose = new_pose
+                    if edl == '\n\n' or (edl == '\n' and reasoning):
+                        self._new()
             else:
-                if self.buffer[:3] == '```':
-                    self.md = _new_md(self.buffer)
-                    code = self.md.parsed[-1]
-                    self.live.update(self.md, refresh=True)
-                    if last_pose != 0:
-                        self._add_snippet(code.info, code.content)
-                        self._new(self.buffer[last_pose+3:])
+                if new_pose == self.code_pose:
+                    if edl == '\n\n' or (edl == '\n' and reasoning):
+                        # print('buffer', f'{self.buffer!r}')
+                        self._new()
                 else:
-                    self.md = _new_md(self.buffer[:last_pose])
-                    self.live.update(self.md, refresh=True)
-                    self._new(self.buffer[last_pose:])
+                    self.code_pose = new_pose
+                    self.code_in = True
         except:
             self.live.update(Text(self.buffer), refresh=True)
 
     def update(self, chunk:str, reasoning:bool=False):
         chunk = re.sub(r"\n{2,}", "\n\n", chunk)
+        # chunk = re.sub(r"\n\s+```", "\n```", chunk)
         length, i, newline = len(chunk), 0, False
         while i < length:
             if chunk[i] == '\n':

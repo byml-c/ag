@@ -3,8 +3,6 @@ import re
 import json
 import traceback
 import subprocess
-from openai import OpenAI
-from render import MDStreamRenderer
 
 from chat import Chat
 

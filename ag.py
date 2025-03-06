@@ -13,14 +13,7 @@ from pathlib import Path
 from chat import Chat
 from deep import Deep
 
-# 配置文件路径
-ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
-CONFIG_FILE  = ROOT_DIR / "config.json"
-VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
-HISTORY_DIR  = ROOT_DIR / ".agdata" / "history"
-HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
-SNIPPETS_DIR = ROOT_DIR / ".agdata" / "snippets"
-HISTORY_FORMAT = r"%Y-%m-%d_%H-%M-%S"
+from _global import *
 
 def complete_cd(text, state):
     # 仅当输入以 "cd " 开头时触发补全
@@ -94,9 +87,18 @@ class Agent:
 
     def save_history(self):
         """保存对话历史"""
-        os.makedirs(HISTORY_DIR, exist_ok=True)
         with open(self.hist_path, "w", encoding="utf-8") as f:
             json.dump(self.history, f, indent=2, ensure_ascii=False)
+    
+    def archive_history(self):
+        '''归档存储历史记录'''
+        if len(self.history['history']) <= 1: return 
+        os.makedirs(HISTORY_DIR, exist_ok=True)
+        if self.hist_path == HISTORY_FILE:
+            time_str = time.strftime(HISTORY_FORMAT, time.localtime())
+            self.hist_path = HISTORY_DIR / f"{time_str}.json"
+            os.remove(HISTORY_FILE)
+        self.save_history()
     
     def save_vars(self):
         """保存变量"""
@@ -126,10 +128,15 @@ class Agent:
         start_time = time.time()
         try:
             result = subprocess.run(
-                cmd, shell=True, check=True, text=True, capture_output=True)
-        finally:
+                cmd, shell=True, check=True, text=True, stdin=sys.stdin, capture_output=True)
             cost_time = int((time.time() - start_time) * 1000)
-            return result.stdout.strip(), cost_time, result.returncode
+            return result.stdout.strip(), result.stderr.strip(), cost_time, result.returncode
+        except subprocess.CalledProcessError as e:
+            cost_time = int((time.time() - start_time) * 1000)
+            return e.stdout.strip(), e.stderr.strip(), cost_time, e.returncode
+        except Exception as e:
+            cost_time = int((time.time() - start_time) * 1000)
+            return "\033[91m---   Unexcepted Error! ---\033[0m", traceback.format_exc(), cost_time, -1
 
     def short(self, s:str, l:int=30):
         """缩短字符串"""
@@ -138,214 +145,259 @@ class Agent:
         else:
             return s
 
-    def command(self, cmd:str):
-        if cmd[:6] == 'change':
-            if cmd == 'change':
-                print()
-                print(f"╭─    修改模型（当前模型：{self.config['model']}）")
-                for model in self.config["models"]:
-                    print(f"│   {model['model']}: ", end="")
-                    for alias in model["alias"]:
-                        print(f"{alias} ", end="")
-                    print()
-                print("├─────────────")
-                model = input("│   请输入模型或别名: ")
-            else:
-                model = cmd[7:]
-            model = self.find_model(model)
-            if model is not None:
-                self.config["model"] = model
-                self.save_config()
-                print(f"╰─    成功切换到模型：{model}")
-            else:
-                print(f"╰─    模型不存在")
-            return 'done'
-        elif cmd in ['cls', 'clear']:
-            os.system('clear')
-            return 'done'
-        elif cmd == 'forget':
-            self.history['history'] = [self.history['history'][0]]
-            self.history['snippet'] = []
-            print()
-            print("╭─    清空历史")
-            print("╰─  历史已清空。")
-            return 'done'
-        elif cmd in ['quit', 'exit', 'bye']:
-            self.save_history()
-            print()
-            print("╭─    再见")
-            print("╰─  历史已保存。")
-            return 'exit'
-        elif cmd == 'load':
-            print()
-            print("╭─    历史记录")
-            hist_files:list[Path] = []
-            if HISTORY_DIR.exists():
-                hist_files = [
-                    (i.stat().st_mtime, i) for i in list(HISTORY_DIR.iterdir())
-                ]
-                hist_files.sort(key=lambda x:x[0], reverse=True)
-            for hid in range(len(hist_files)):
-                print(f"│   {hid:3}: [{hist_files[hid][1].name.replace('.json', '')}] ", end="")
-                with open(hist_files[hid][1], encoding="utf-8") as f:
-                    hist = json.load(f)
-                    if len(hist['history']) > 1:
-                        print(f"{self.short(hist['history'][1]['content'])!r}", end='')
-                print()
-            print("├─────────────")
-            hist = input("│   请输入历史记录编号: ")
-            try:
-                hist = int(hist)
-                if hist >= 0 and hist < len(hist_files):
-                    self.hist_path:Path = hist_files[hist][1]
-                    self.history = self.load_history(False)
-                    print(f"├─    成功切换到历史记录：{self.hist_path.name.replace('.json', '')}")
-                    record = input("├─  是否需要打印历史记录？[y/n]: ").lower()
-                    if record == 'y':
-                        self.command('clear')
-                        self.chat._render_history(self.history)
-                    else:
-                        print(f"╰─────────────")
-                    self.update_snippet()
-                else:
-                    raise Exception("Records is not exist.")
-            except:
-                print(f"╰─    历史记录不存在")
-            return 'done'
-        elif cmd[:4] == 'chat':
-            print()
-            print(f"╭─    切换对话模式")
-            if cmd[4:].strip() == '1':
-                self.config['deep'] = True
-            elif cmd[4:].strip() == '0':
-                self.config['deep'] = False
-            else:
-                self.config['deep'] = not self.config['deep']
-            self.save_config()
-            print(f"╰─  已切换到{'深度对话' if self.config['deep'] else '普通对话'}")
-            return 'done'
-        elif cmd[:5] == 'chdir':
-            print()
-            print(f"╭─  󰴌  切换工作目录（可直接执行 bash 命令）")
-            while True:
+    def terminal(self, cmd:str=None, single:bool=True):
+        '''终端命令模式'''
+        while True:
+            if not single:
                 try:
-                    cmd = input(f"├─  {os.getcwd()} > ").strip()
-                    if cmd.startswith("cd "):
-                        path = cmd[3:].strip()
-                        os.chdir(os.path.expanduser(path))
-                    elif cmd == "cd":
-                        os.chdir(os.path.expanduser("~"))
-                    elif cmd == 'exit':
-                        break
-                    else:
-                        out, cost_time, returncode = self.bash(cmd)
-                        print(out)
-                        print(f"├─    执行结束，  {cost_time} ms, return {returncode}")
-                except (FileNotFoundError, NotADirectoryError):
-                    print("├─    路径不存在！")
+                    print(f"╭─    {os.getcwd()}")
+                    cmd = self.input_lines(f"├─   $ ").strip()
                 except KeyboardInterrupt:
-                    break
-            print(f"╰─  󰈆  已退出切换模式")
-            return 'done'
-        elif cmd[:4] == 'bash':
-            print()
-            print(f"╭─    终端命令")
-            try:
-                out, cost_time, returncode = self.bash(cmd[5:])
-                print(out)
-                print(f"╰─    执行结束，  {cost_time} ms, return {returncode}")
-            except KeyboardInterrupt:
-                print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
-            except Exception as e:
-                print(f"╰─    执行出错：{e}")
-            return 'done'
-        elif cmd[:4] in ['varr', 'vart']:
-            print()
-            print(f"╭─    设置常值变量")
-            try:
-                cmd = cmd[5:].split(' ', 1)
-                out, cost_time, returncode = self.bash(cmd[1:])
-                self.vars["users"][cmd[0]] = out
-                self.save_vars()
-                print(f"├─  {cmd[0]} = {self.short(self.vars['users'][cmd[0]])!r}")
-                print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
-            except KeyboardInterrupt:
-                print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
-            except Exception as e:
-                print(f"╰─    设置失败：{e}")
-            return 'done'
-        elif cmd[:4] in ['varc', 'varb']:
-            print()
-            print(f"╭─    设置终端变量")
-            try:
-                cmd = cmd[5:].split(' ', 1)
-                self.vars["bash"][cmd[0]] = cmd[1]
-                self.save_vars()
-                print(f"├─  {cmd[0]} = {self.vars['bash'][cmd[0]]!r}")
-                print(f"╰─    设置成功")
-            except KeyboardInterrupt:
-                print(f"╰─    中断设置")
-            except Exception as e:
-                print(f"╰─    设置失败：{e}")
-            return 'done'
-        elif cmd[:4] == 'show':
-            user_print, bash_print = False, False
-            def print_title(t:str):
-                nonlocal user_print, bash_print
-                if t == 'u' and not user_print:
-                    print("├─    常值文本变量")
-                    user_print = True
-                if t == 'b' and not bash_print:
-                    print("├─    终端命令变量")
-                    bash_print = True
-            print()
-            print(f"╭─    变量列表")
-            cmd = cmd[5:].strip()
-            for k, v in self.vars["users"].items():
-                if cmd == '' or re.match(cmd, k):
-                    print_title('u')
-                    print(f"│   {k:10} = {self.short(v)!r}")
-            for k, v in self.vars["bash"].items():
-                if cmd == '' or re.match(cmd, k):
-                    print_title('b')
-                    print(f"│   {k:10} = {v!r}")
-            print("╰─────────────")
-            return 'done'
-        elif cmd[:7] == 'snippet':
-            print()
-            print(f"╭─    代码列表")
-            cmd = cmd[5:].strip()
-            for sid in range(len(self.history['snippet'])):
-                snippet = self.history['snippet'][sid]
-                if cmd == '' or snippet['lang'] == cmd:
-                    print(f"│   $S{sid:<3} [{snippet['lang']:10}]: {self.short(snippet['code'])!r}")
-            print("╰─────────────")
-            return 'done'
-        else:
-            print()
-            if cmd != 'help':
-                print(f"╭─    未知命令 \"{cmd}\"")
-                print(f"├─  󰘥  帮助")
+                    print()
+                    print("╰─  󰈆  退出终端模式")
+                    return 'done'
+            splitted = cmd.split(' ', 1) if ' ' in cmd else (cmd, '')
+            exec, args = splitted[0].strip(), splitted[1].strip()
+            
+            match exec:
+                case 'help':
+                    print("╭─  󰘥  帮助（模式：{}，模型：{} ）".format(
+                        "终端模式" if not single else ("深度对话" if self.config['deep'] else "普通对话"),
+                        self.config['model']))
+                    print("├─  控制语法为 /+命令，终端模式直接使用命令，变量在对话时可通过 {var_name} 引用")
+                    print("├─    控制模式")
+                    print("│   new    : 保存对话并开启新对话")
+                    print("│   cls    : 清空屏幕，历史、变量均不会清空")
+                    print("│   load   : 加载历史")
+                    print("│   forget : 清空历史，变量不会清空")
+                    print("│   change : 切换模型")
+                    print("│   chat   : 切换到{}".format("普通对话" if self.config['deep'] else "深度对话"))
+                    print("│   bash   : 进入终端命令模式")
+                    print("│   help   : 查看帮助")
+                    print("│   exit   : 退出对话")
+                    print("│   show <option:name>       : 打印变量，支持正则，无参数时打印所有变量")
+                    print("│   snippet <option:language>: 查看代码片段，支持正则，无参数时打印所有变量")
+                    print("├─    终端模式")
+                    print("│   cd <path>            : 进入对应路径并将工作目录切换至该路径")
+                    print("│   setr <name> <command>: 将终端命令运行结果保存在变量中")
+                    print("│   setb <name> <command>: 将终端命令直接保存在变量中")
+                    print("│   <command>            : 执行终端命令（包括控制模式命令），可直接获取返回值")
+                    print("│   exit                 : 退出终端模式，返回对话模式")
+                    print("╰─────────────")
+                
+                case 'new':
+                    self.archive_history()
+                    self.hist_path = HISTORY_FILE
+                    self.history['history'] = [self.history['history'][0]]
+                    self.history['snippet'] = []
+                    self.terminal('clear', True)
+                
+                case 'cls' | 'clear':
+                    os.system('clear')
+                
+                case 'load':
+                    print()
+                    print("╭─    历史记录")
+                    hist_files:list[Path] = []
+                    if HISTORY_DIR.exists():
+                        hist_files = [
+                            (i.stat().st_mtime, i) for i in list(HISTORY_DIR.iterdir())
+                        ]
+                        hist_files.sort(key=lambda x:x[0], reverse=True)
+                    for hid in range(len(hist_files)):
+                        print(f"│   {hid:3}: [{hist_files[hid][1].name.replace('.json', '')}] ", end="")
+                        with open(hist_files[hid][1], encoding="utf-8") as f:
+                            hist = json.load(f)
+                            if len(hist['history']) > 1:
+                                print(f"{self.short(hist['history'][1]['content'])!r}", end='')
+                        print()
+                    print("├─────────────")
+                    hist = input("│   请输入历史记录编号: ")
+                    try:
+                        hist = int(hist)
+                        if hist >= 0 and hist < len(hist_files):
+                            self.hist_path:Path = hist_files[hist][1]
+                            self.history = self.load_history(False)
+                            print(f"├─    成功切换到历史记录：{self.hist_path.name.replace('.json', '')}")
+                            record = input("├─  是否需要打印历史记录？[y/n]: ").lower()
+                            if record == 'y':
+                                self.terminal('clear', True)
+                                _, result = self.chat._render_history(self.history)
+                                self.history['snippet'] = result
+                            else:
+                                print(f"╰─────────────")
+                            self.update_snippet()
+                        else:
+                            raise Exception("Records is not exist.")
+                    except:
+                        print(f"╰─    历史记录不存在")
+                
+                case 'forget':
+                    self.history['history'] = [self.history['history'][0]]
+                    self.history['snippet'] = []
+                    print()
+                    print("╭─    清空历史")
+                    print("╰─  历史已清空。")
+                
+                case 'change':
+                    if args == '':
+                        print()
+                        print(f"╭─    修改模型（当前模型：{self.config['model']}）")
+                        for model in self.config["models"]:
+                            print(f"│   {model['model']}: ", end="")
+                            for alias in model["alias"]:
+                                print(f"{alias} ", end="")
+                            print()
+                        print("├─────────────")
+                        model = input("│   请输入模型或别名: ")
+                    else:
+                        model = args
+                    model = self.find_model(model)
+                    if model is not None:
+                        self.config["model"] = model
+                        self.save_config()
+                        print(f"╰─    成功切换到模型：{model}")
+                    else:
+                        print(f"╰─    模型不存在")
+                
+                case 'chat':
+                    print()
+                    print(f"╭─    切换对话模式")
+                    if cmd[4:].strip() == '1':
+                        self.config['deep'] = True
+                    elif cmd[4:].strip() == '0':
+                        self.config['deep'] = False
+                    else:
+                        self.config['deep'] = not self.config['deep']
+                    self.save_config()
+                    print(f"╰─  已切换到{'深度对话' if self.config['deep'] else '普通对话'}")
+                
+                case 'show':
+                    user_print, bash_print = False, False
+                    def print_title(t:str):
+                        nonlocal user_print, bash_print
+                        if t == 'u' and not user_print:
+                            print("├─    常值文本变量")
+                            user_print = True
+                        if t == 'b' and not bash_print:
+                            print("├─    终端命令变量")
+                            bash_print = True
+                    print()
+                    print(f"╭─    变量列表")
+                    for k, v in self.vars["users"].items():
+                        if args == '' or re.match(args, k):
+                            print_title('u')
+                            print(f"│   {k:10} = {self.short(v)!r}")
+                    for k, v in self.vars["bash"].items():
+                        if args == '' or re.match(args, k):
+                            print_title('b')
+                            print(f"│   {k:10} = {v!r}")
+                    print("╰─────────────")
+                
+                case 'snippet':
+                    print()
+                    print(f"╭─    代码列表")
+                    for sid in range(len(self.history['snippet'])):
+                        snippet = self.history['snippet'][sid]
+                        if args == '' or re.match(args, snippet['lang']):
+                            print(f"│   $S{sid:<3} [{snippet['lang']:10}]: {self.short(snippet['code'])!r}")
+                    print("╰─────────────")
+                
+                case 'exit':
+                    if single:
+                        return 'exit'
+                    else:
+                        break
+                
+                case 'cd':
+                    try:
+                        if args == '':
+                            os.chdir(os.path.expanduser("~"))
+                        else:
+                            os.chdir(os.path.expanduser(args))
+                    except (FileNotFoundError, NotADirectoryError):
+                        print("╰─    路径不存在！")
+                
+                case 'setr' | 'sett':
+                    print()
+                    print(f"╭─    设置常值变量")
+                    try:
+                        name, command = args.split(' ', 1)
+                        out, err, cost_time, returncode = self.bash(command)
+                        print('A')
+                        
+                        exists = None
+                        if name in self.vars["users"]:
+                            exists = ("users", "常值")
+                        elif name in self.vars["bash"]:
+                            exists = ("bash", "终端")
+                        if exists is not None:
+                            valid = input(f"├─    {exists[1]}变量 {name} 已存在，是否覆盖？[y/n]: ")
+                            if valid.lower() == 'y':
+                                self.vars[exists[0]].pop(name)
+                            else: raise KeyboardInterrupt
+                        
+                        self.vars["users"][name] = out
+                        self.save_vars()
+                        print(f"├─  {name} = {self.short(self.vars['users'][name])!r}")
+                        print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
+                    except KeyboardInterrupt:
+                        print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
+                    except Exception as e:
+                        print(f"╰─    设置失败：{e}")
+                
+                case 'setb' | 'setc':
+                    print()
+                    print(f"╭─    设置终端变量")
+                    try:
+                        name, command = args.split(' ', 1)
+                        
+                        exists = None
+                        if name in self.vars["users"]:
+                            exists = ("users", "常值")
+                        elif name in self.vars["bash"]:
+                            exists = ("bash", "终端")
+                        if exists is not None:
+                            valid = input(f"├─    {exists[1]}变量 {name} 已存在，是否覆盖？[y/n]: ")
+                            if valid.lower() == 'y':
+                                self.vars[exists[0]].pop(name)
+                            else: raise KeyboardInterrupt
+                        
+                        self.vars["bash"][name] = command
+                        self.save_vars()
+                        print(f"├─  {name} = {self.vars['bash'][name]!r}")
+                        print(f"╰─    设置成功")
+                    except KeyboardInterrupt:
+                        print(f"╰─    中断设置")
+                    except Exception as e:
+                        print(f"╰─    设置失败：{e}")
+                
+                case _:
+                    out, err, cost_time, returncode = self.bash(cmd)
+                    print(out)
+                    if returncode != 0:
+                        print(f"├─────────────")
+                        print(err)
+                        print(f"╰─    执行失败，  {cost_time} ms, return {returncode}")
+                    else:
+                        print(f"╰─    执行结束，  {cost_time} ms, return {returncode}")
+            
+            if single: break
+        return 'done'
+
+    def command(self, cmd:str):
+        '''控制命令模式'''
+        try:
+            if cmd.startswith('bash'):
+                if cmd == 'bash':
+                    return self.terminal(None, False)
+                else:
+                    return self.terminal(cmd[4:], True)
             else:
-                print("╭─  󰘥  帮助")
-            print("├─  命令语法为 /+命令，变量在对话时可通过 {var_name} 引用")
-            print("├─    控制命令")
-            print("│   cls    : 清空屏幕，历史、变量均不会清空")
-            print("│   forget : 清空历史，变量不会清空")
-            print("│   load   : 加载历史")
-            print("│   change : 切换模型")
-            print("│   chat   : 切换到{}".format("普通对话" if self.config['deep'] else "深度对话"))
-            print("│   chdir  : 进入切换工作目录模式")
-            print("│   snippet: 查看代码片段")
-            print("│   help   : 查看帮助")
-            print("│   exit   : 退出")
-            print("├─    终端命令")
-            print("│   bash <command>       : 结果将直接输出在对话框中")
-            print("│   varr <name> <command>: 将终端命令运行结果保存在变量中")
-            print("│   varc <name> <command>: 将终端命令直接保存在变量中")
-            print("│   show <option:name>   : 打印变量，支持正则，无参数时打印所有变量")
-            print("╰─────────────")
-            return 'done'
+                return self.terminal(cmd, True)
+        except:
+            print(f"╭─    终端模式错误")
+            print(f"╰─  {traceback.format_exc()}")
     
     def prase(self, ipt:str):
         """解析输入"""
@@ -382,7 +434,7 @@ class Agent:
                 print(f'\n╭─  {icon} {user_name}', flush=True)
                 user_input = self.input_lines(f"╰─  ").strip()
                 if len(user_input) > 0 and user_input[0] == '/':
-                    ret = self.command(user_input[1:])
+                    ret = self.command(user_input[1:].strip())
                     if ret == 'exit':
                         break
                 else:
@@ -412,18 +464,14 @@ class Agent:
                         self.update_snippet()
         except KeyboardInterrupt:
             print()
-            print("╭─    终止")
+            print("╭─  󰈆  终止")
             print("╰─  退出程序")
         except Exception as _:
             print()
             print(f"╭─    错误")
             print(f"╰─  {traceback.format_exc()}")
-        if len(self.history['history']) > 1:
-            if self.hist_path == HISTORY_FILE:
-                time_str = time.strftime(HISTORY_FORMAT, time.localtime())
-                self.hist_path = HISTORY_DIR / f"{time_str}.json"
-                os.remove(HISTORY_FILE)
-            self.save_history()
+        
+        self.archive_history()
 
 def main():
     ai = Agent()
