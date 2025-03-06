@@ -6,7 +6,7 @@ import json
 import time
 import argparse
 
-# import readline
+import pyreadline
 import traceback
 import subprocess
 from pathlib import Path
@@ -39,8 +39,8 @@ def complete_cd(text, state):
     return None
 
 
-readline.set_completer(complete_cd)
-readline.parse_and_bind("tab: complete")
+pyreadline.set_completer(complete_cd)
+pyreadline.parse_and_bind("tab: complete")
 
 
 class Agent:

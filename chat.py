@@ -94,7 +94,7 @@ class Chat:
                     print(f"╭─  {icon} {metadata.get('user', 'User')}")
                     print(f"╰─  {item['content']}")
             elif item["role"] == "assistant":
-                print(f"╭─  󱚣  {metadata.get('model', 'Model')}")
+                print(f"╭─  󱚣  {metadata.get('model', 'Model')[:11]}")
                 try:
                     result = self._render_response(gen(item["content"]), len(snippet))
                     snippet += result["snippets"]
@@ -127,7 +127,7 @@ class Chat:
                 stream=True,
             )
 
-            print(f"╭─  󱚣  {model}")
+            print(f"╭─  󱚣  {model[:11]}")
             result = self._render_response(response, len(history["snippet"]))
             print("╰─────────────")
             history["snippet"] += result["snippets"]
