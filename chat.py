@@ -12,13 +12,12 @@ class Chat:
         os.environ["https_proxy"] = ""
         self.client = OpenAI(api_key=api_key, base_url=base_url)
 
-    def _render_response(self, response, history: dict[str, list] = None):
-        if history is None:
-            history = {"snippet": [], "history": []}
+    def _render_response(self, response, snippet_start: int = 0):
         reasoning_content, answer_content = "", ""
         is_reasoning, is_answering = False, False
 
-        with MDStreamRenderer(len(history["snippet"])) as markdown:
+        snippets = []
+        with MDStreamRenderer(snippet_start) as markdown:
             for chunk in response:
                 if not chunk.choices:
                     continue
@@ -32,7 +31,10 @@ class Chat:
                         print("├─  󰟷  THINK", flush=True)
                         markdown.update("> ")
                         is_reasoning = True
-                    markdown.update(re.sub(r"\n+", "\n> ", delta.reasoning_content))
+                    markdown.update(
+                        chunk=re.sub(r"\n+", "\n> ", delta.reasoning_content),
+                        reasoning=True,
+                    )
                     reasoning_content += delta.reasoning_content
                 else:
                     # 开始回复
@@ -45,16 +47,19 @@ class Chat:
                     # 打印回复过程
                     markdown.update(delta.content)
                     answer_content += delta.content
-            markdown._end()
-            history["snippet"] += markdown.code_list
+            snippets += markdown.code_list
         if is_reasoning or is_answering:
             print()
-        history["history"].append({"role": "assistant", "content": answer_content})
-        return history, reasoning_content
+
+        return {
+            "answer": answer_content,
+            "reasoning": reasoning_content,
+            "snippets": snippets,
+        }
 
     def _render_history(self, history: dict[str, list]):
         """
-        打印历史记录，同时会清空 history['snippet'] 并重新生成
+        打印历史记录，不会修改传入的历史记录
         """
 
         class Delta:
@@ -72,31 +77,49 @@ class Chat:
             def __init__(self, text, reasoning=False):
                 self.choices = [Choice(text, reasoning)]
 
-        def gen(s: str, batch: int = 100):
+        def gen(s: str, batch: int = 1000):
             for i in range(0, len(s), batch):
                 yield Chunk(s[i : i + batch])
 
-        history["snippet"] = []
+        snippet = []
         for item in history["history"]:
+            metadata: dict = item.get("metadata", {})
             if item["role"] == "user":
-                print(f"╭─  󱋊  User")
-                print(f"╰─  {item['content']}")
+                if metadata.get("run", False):
+                    print(f"╭─    运行结果")
+                    print(item["content"])
+                    print(f"╰─────────────")
+                else:
+                    icon = "󰧑 " if metadata.get("deep", False) else "󱋊 "
+                    print(f"╭─  {icon} {metadata.get('user', 'User')}")
+                    print(f"╰─  {item['content']}")
             elif item["role"] == "assistant":
-                print(f"╭─  󱚣  Model")
+                print(f"╭─  󱚣  {metadata.get('model', 'Model')}")
                 try:
-                    hist, _ = self._render_response(gen(item["content"]))
-                    history["snippet"] += hist["snippet"]
+                    result = self._render_response(gen(item["content"]), len(snippet))
+                    snippet += result["snippets"]
                 except:
                     print(traceback.format_exc())
                 print(f"╰─────────────")
         return history
 
     def chat(
-        self, msg: str, history: dict[str, list], model: str, temperature: float = 0.7
+        self,
+        user: str,
+        msg: str,
+        history: dict[str, list],
+        model: str,
+        temperature: float = 0.7,
     ):
-        """对话"""
+        """对话，会修改传入的历史记录"""
         try:
-            history["history"].append({"role": "user", "content": msg})
+            history["history"].append(
+                {
+                    "role": "user",
+                    "content": msg,
+                    "metadata": {"user": user, "run": False, "deep": False},
+                }
+            )
             response = self.client.chat.completions.create(
                 model=model,
                 messages=history["history"],
@@ -104,10 +127,17 @@ class Chat:
                 stream=True,
             )
 
-            print(f"╭─  󱚣  {model[:11]}")
-            _, answer_content = self._render_response(response, history)
+            print(f"╭─  󱚣  {model}")
+            result = self._render_response(response, len(history["snippet"]))
             print("╰─────────────")
-            history["history"].append({"role": "assistant", "content": answer_content})
+            history["snippet"] += result["snippets"]
+            history["history"].append(
+                {
+                    "role": "assistant",
+                    "content": result["answer"],
+                    "metadata": {"model": model},
+                }
+            )
         except KeyboardInterrupt:
             print()
             print("╭─    中断")

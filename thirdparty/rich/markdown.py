@@ -163,11 +163,12 @@ class CodeBlock(TextElement):
     def create(cls, markdown: Markdown, token: Token) -> CodeBlock:
         node_info = token.info or ""
         lexer_name = node_info.partition(" ")[0]
-        return cls(lexer_name or "text", markdown.code_theme)
+        return cls(lexer_name or "text", markdown.code_theme, token.meta.get("sid", 0))
 
-    def __init__(self, lexer_name: str, theme: str) -> None:
+    def __init__(self, lexer_name: str, theme: str, sid:int=0) -> None:
         self.lexer_name = lexer_name
         self.theme = theme
+        self.sid = sid
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions

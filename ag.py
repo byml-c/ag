@@ -21,6 +21,26 @@ VARS_FILE = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR = ROOT_DIR / ".agdata" / "history"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 SNIPPETS_DIR = ROOT_DIR / ".agdata" / "snippets"
+HISTORY_FORMAT = r"%Y-%m-%d_%H-%M-%S"
+
+
+def complete_cd(text, state):
+    # 仅当输入以 "cd " 开头时触发补全
+    ipt = readline.get_line_buffer()
+    if ipt.startswith("cd "):
+        # 获取当前目录下所有匹配的文件夹
+        pth = os.path.abspath("/".join(ipt[3:].split("/")[:-1]))
+        dirs = [
+            d + "/"
+            for d in os.listdir(pth)
+            if os.path.isdir(os.path.join(pth, d)) and d.startswith(text)
+        ]
+        return dirs[state] if state < len(dirs) else None
+    return None
+
+
+readline.set_completer(complete_cd)
+readline.parse_and_bind("tab: complete")
 
 
 class Agent:
@@ -30,14 +50,22 @@ class Agent:
         self.hist_path = HISTORY_FILE
         self.history = self.load_history()
         self.vars = self.load_vars()
+
         self.chat = Chat(self.config["api_key"], self.config["base_url"])
         self.deep = Deep(self.config["api_key"], self.config["base_url"])
 
         # 初始化系统提示
-        if not any(msg["role"] == "system" for msg in self.history["history"]):
-            self.history["history"].insert(
-                0, {"role": "system", "content": self.config["system_prompt"]}
-            )
+        self.history["history"].insert(
+            0,
+            {
+                "role": "system",
+                "content": (
+                    self.config["deep_prompt"]
+                    if self.config["deep"]
+                    else self.config["chat_prompt"]
+                ),
+            },
+        )
 
     @staticmethod
     def load_config():
@@ -165,26 +193,29 @@ class Agent:
             print("╭─    历史记录")
             hist_files: list[Path] = []
             if HISTORY_DIR.exists():
-                hist_files = list(HISTORY_DIR.iterdir())
+                hist_files = [
+                    (i.stat().st_mtime, i) for i in list(HISTORY_DIR.iterdir())
+                ]
+                hist_files.sort(key=lambda x: x[0], reverse=True)
             for hid in range(len(hist_files)):
                 print(
-                    f"│   {hid:3}: [{hist_files[hid].name.replace('.json', '')}] ",
+                    f"│   {hid:3}: [{hist_files[hid][1].name.replace('.json', '')}] ",
                     end="",
                 )
-                with open(hist_files[hid], encoding="gbk") as f:
+                with open(hist_files[hid][1], encoding="utf-8") as f:
                     hist = json.load(f)
                     if len(hist["history"]) > 1:
-                        print(self.short(hist["history"][1]["content"]), end="")
+                        print(f"{self.short(hist['history'][1]['content'])!r}", end="")
                 print()
             print("├─────────────")
             hist = input("│   请输入历史记录编号: ")
             try:
                 hist = int(hist)
                 if hist >= 0 and hist < len(hist_files):
-                    self.hist_path = hist_files[hist]
+                    self.hist_path: Path = hist_files[hist][1]
                     self.history = self.load_history(False)
                     print(
-                        f"├─    成功切换到历史记录：{hist_files[hist].name.replace('.json', '')}"
+                        f"├─    成功切换到历史记录：{self.hist_path.name.replace('.json', '')}"
                     )
                     record = input("├─  是否需要打印历史记录？[y/n]: ").lower()
                     if record == "y":
@@ -197,6 +228,43 @@ class Agent:
                     raise Exception("Records is not exist.")
             except:
                 print(f"╰─    历史记录不存在")
+            return "done"
+        elif cmd[:4] == "chat":
+            print()
+            print(f"╭─    切换对话模式")
+            if cmd[4:].strip() == "1":
+                self.config["deep"] = True
+            elif cmd[4:].strip() == "0":
+                self.config["deep"] = False
+            else:
+                self.config["deep"] = not self.config["deep"]
+            self.save_config()
+            print(f"╰─  已切换到{'深度对话' if self.config['deep'] else '普通对话'}")
+            return "done"
+        elif cmd[:5] == "chdir":
+            print()
+            print(f"╭─  󰴌  切换工作目录（可直接执行 bash 命令）")
+            while True:
+                try:
+                    cmd = input(f"├─  {os.getcwd()} > ").strip()
+                    if cmd.startswith("cd "):
+                        path = cmd[3:].strip()
+                        os.chdir(os.path.expanduser(path))
+                    elif cmd == "cd":
+                        os.chdir(os.path.expanduser("~"))
+                    elif cmd == "exit":
+                        break
+                    else:
+                        out, cost_time, returncode = self.bash(cmd)
+                        print(out)
+                        print(
+                            f"├─    执行结束，  {cost_time} ms, return {returncode}"
+                        )
+                except (FileNotFoundError, NotADirectoryError):
+                    print("├─    路径不存在！")
+                except KeyboardInterrupt:
+                    break
+            print(f"╰─  󰈆  已退出切换模式")
             return "done"
         elif cmd[:4] == "bash":
             print()
@@ -218,7 +286,7 @@ class Agent:
                 out, cost_time, returncode = self.bash(cmd[1:])
                 self.vars["users"][cmd[0]] = out
                 self.save_vars()
-                print(f"├─  {cmd[0]} = \"{self.short(self.vars['users'][cmd[0]])}\"")
+                print(f"├─  {cmd[0]} = {self.short(self.vars['users'][cmd[0]])!r}")
                 print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
             except KeyboardInterrupt:
                 print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
@@ -232,7 +300,7 @@ class Agent:
                 cmd = cmd[5:].split(" ", 1)
                 self.vars["bash"][cmd[0]] = cmd[1]
                 self.save_vars()
-                print(f"├─  {cmd[0]} = \"{self.vars['bash'][cmd[0]]}\"")
+                print(f"├─  {cmd[0]} = {self.vars['bash'][cmd[0]]!r}")
                 print(f"╰─    设置成功")
             except KeyboardInterrupt:
                 print(f"╰─    中断设置")
@@ -264,7 +332,7 @@ class Agent:
                     print(f"│   {k:10} = {v!r}")
             print("╰─────────────")
             return "done"
-        elif cmd[:4] == "snippet":
+        elif cmd[:7] == "snippet":
             print()
             print(f"╭─    代码列表")
             cmd = cmd[5:].strip()
@@ -285,13 +353,19 @@ class Agent:
                 print("╭─  󰘥  帮助")
             print("├─  命令语法为 /+命令，变量在对话时可通过 {var_name} 引用")
             print("├─    控制命令")
-            print("│   cls   : 清空屏幕，历史、变量均不会清空")
-            print("│   forget: 清空历史，变量不会清空")
-            print("│   load  : 加载历史")
-            print("│   change: 切换模型")
-            print("│   snippet  : 查看代码片段")
-            print("│   help  : 查看帮助")
-            print("│   exit  : 退出")
+            print("│   cls    : 清空屏幕，历史、变量均不会清空")
+            print("│   forget : 清空历史，变量不会清空")
+            print("│   load   : 加载历史")
+            print("│   change : 切换模型")
+            print(
+                "│   chat   : 切换到{}".format(
+                    "普通对话" if self.config["deep"] else "深度对话"
+                )
+            )
+            print("│   chdir  : 进入切换工作目录模式")
+            print("│   snippet: 查看代码片段")
+            print("│   help   : 查看帮助")
+            print("│   exit   : 退出")
             print("├─    终端命令")
             print("│   bash <command>       : 结果将直接输出在对话框中")
             print("│   varr <name> <command>: 将终端命令运行结果保存在变量中")
@@ -321,13 +395,13 @@ class Agent:
     @staticmethod
     def input_lines(prompt):
         content = ""
-        print(prompt, end="")
+        line = input(prompt).rstrip()
         while True:
-            line = input()
-            if line.strip().endswith("\\"):
+            if line.endswith("\\"):
                 content += line[:-1] + "\n"
             else:
                 break
+            line = input().rstrip()
         return content + line
 
     def main(self):
@@ -335,56 +409,43 @@ class Agent:
         try:
             user_name = self.get_user()
             while True:
-                user_input = self.input_lines(f"\n╭─  󱋊 {user_name}\n╰─  ").strip()
+                icon = "󰧑 " if self.config["deep"] else "󱋊 "
+                print(f"\n╭─  {icon} {user_name}", flush=True)
+                user_input = self.input_lines(f"╰─  ").strip()
                 if len(user_input) > 0 and user_input[0] == "/":
                     ret = self.command(user_input[1:])
                     if ret == "exit":
                         break
                 else:
-                    self.deep_solve = True
-                    if self.deep_solve:
-                        self.history["history"][0][
-                            "content"
-                        ] = """
-你是一个智能助手，拥有调用工具的能力，可以帮助用户解决遇到的问题。
-
-当你需要调用工具时，你需要**只以 JSON 格式输出一个数组**，数组中的每个元素是一个字典，取值为以下两种：
-1. `{"name": "python", "code": ""}` 表示调用 Python 执行代码，`code` 为 Python 代码字符串。
-2. `{"name": "bash", "code": ""}` 表示调用 Bash 执行代码，`code` 为 Bash 代码字符串。
-如果执行成功，你将会在下一次输入时得到调用代码的 stdout 结果，否则，你将收到 stderr 的结果。
-
-比如：
-用户提问：请介绍一下我的 Python 版本。
-你的输出：
-```json
-[{"name": "bash", "code": "python3 --version"}]
-```
-用户返回：[{"name": "bash", "code": "python3 --version", "stdout": "Python 3.12.7\n"}]
-
-然后，你可以正常回答用户的问题。
-注意，只有在你以 ```json ... ``` 格式输出时，才会调用工具。否则，你并不会收到调用工具的结果。
-所以，当你希望调用工具时，**请不要有任何其他的输出和提示**。
-
-你需要合理思考，灵活运用工具，帮助用户解决遇到的问题！
-"""
-
+                    if self.config["deep"]:
+                        self.history["history"][0]["content"] = self.config[
+                            "deep_prompt"
+                        ]
                         msg = self.prase(user_input)
-                        for _ in range(20):
+                        for round in range(20):
                             status, cmd, _ = self.deep.chat(
+                                user=user_name,
                                 msg=msg,
                                 history=self.history,
                                 model=self.config["model"],
+                                run=round > 0,
                             )
+                            self.update_snippet()
                             if status == "exec":
                                 msg = cmd
                             else:
                                 break
                     else:
+                        self.history["history"][0]["content"] = self.config[
+                            "chat_prompt"
+                        ]
                         status, _ = self.chat.chat(
+                            user=user_name,
                             msg=self.prase(user_input),
                             history=self.history,
                             model=self.config["model"],
                         )
+                        self.update_snippet()
         except KeyboardInterrupt:
             print()
             print("╭─    终止")
@@ -395,7 +456,7 @@ class Agent:
             print(f"╰─  {traceback.format_exc()}")
         if len(self.history["history"]) > 1:
             if self.hist_path == HISTORY_FILE:
-                time_str = time.strftime(r"%Y-%m-%d_%H-%M-%S", time.localtime())
+                time_str = time.strftime(HISTORY_FORMAT, time.localtime())
                 self.hist_path = HISTORY_DIR / f"{time_str}.json"
                 os.remove(HISTORY_FILE)
             self.save_history()
