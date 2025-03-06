@@ -15,7 +15,7 @@ from chat import Chat
 from deep import Deep
 
 # 配置文件路径
-ROOT_DIR = Path(r"D:\\Programming\\ag")
+ROOT_DIR = Path(r"E:\\Programing\\ag")
 CONFIG_FILE = ROOT_DIR / "config.json"
 VARS_FILE = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR = ROOT_DIR / ".agdata" / "history"

@@ -85,7 +85,7 @@ class Deep(Chat):
                 stream=True,
             )
 
-            print(f"╭─  󱚣  {model}")
+            print(f"╭─  󱚣  {model[:11]}")
             result = self._render_response(response, len(history["snippet"]))
             history["snippet"] += result["snippets"]
             history["history"].append(
