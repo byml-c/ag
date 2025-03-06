@@ -24,23 +24,23 @@ SNIPPETS_DIR = ROOT_DIR / ".agdata" / "snippets"
 HISTORY_FORMAT = r"%Y-%m-%d_%H-%M-%S"
 
 
-def complete_cd(text, state):
-    # 仅当输入以 "cd " 开头时触发补全
-    ipt = readline.get_line_buffer()
-    if ipt.startswith("cd "):
-        # 获取当前目录下所有匹配的文件夹
-        pth = os.path.abspath("/".join(ipt[3:].split("/")[:-1]))
-        dirs = [
-            d + "/"
-            for d in os.listdir(pth)
-            if os.path.isdir(os.path.join(pth, d)) and d.startswith(text)
-        ]
-        return dirs[state] if state < len(dirs) else None
-    return None
+# def complete_cd(text, state):
+#     # 仅当输入以 "cd " 开头时触发补全
+#     ipt = pyreadline.get_line_buffer()
+#     if ipt.startswith("cd "):
+#         # 获取当前目录下所有匹配的文件夹
+#         pth = os.path.abspath("/".join(ipt[3:].split("/")[:-1]))
+#         dirs = [
+#             d + "/"
+#             for d in os.listdir(pth)
+#             if os.path.isdir(os.path.join(pth, d)) and d.startswith(text)
+#         ]
+#         return dirs[state] if state < len(dirs) else None
+#     return None
 
 
-pyreadline.set_completer(complete_cd)
-pyreadline.parse_and_bind("tab: complete")
+# pyreadline.set_completer(complete_cd)
+# pyreadline.parse_and_bind("tab: complete")
 
 
 class Agent:
@@ -264,7 +264,7 @@ class Agent:
                     print("├─    路径不存在！")
                 except KeyboardInterrupt:
                     break
-            print(f"╰─  󰈆  已退出切换模式")
+            print(f"\n╰─  󰈆  已退出切换模式")
             return "done"
         elif cmd[:4] == "bash":
             print()
@@ -274,7 +274,7 @@ class Agent:
                 print(out)
                 print(f"╰─    执行结束，  {cost_time} ms, return {returncode}")
             except KeyboardInterrupt:
-                print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
+                print(f"\n╰─    中断执行，  {cost_time} ms, return {returncode}")
             except Exception as e:
                 print(f"╰─    执行出错：{e}")
             return "done"
@@ -289,7 +289,7 @@ class Agent:
                 print(f"├─  {cmd[0]} = {self.short(self.vars['users'][cmd[0]])!r}")
                 print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
             except KeyboardInterrupt:
-                print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
+                print(f"\n╰─    中断执行，  {cost_time} ms, return {returncode}")
             except Exception as e:
                 print(f"╰─    设置失败：{e}")
             return "done"
@@ -303,7 +303,7 @@ class Agent:
                 print(f"├─  {cmd[0]} = {self.vars['bash'][cmd[0]]!r}")
                 print(f"╰─    设置成功")
             except KeyboardInterrupt:
-                print(f"╰─    中断设置")
+                print(f"\n╰─    中断设置")
             except Exception as e:
                 print(f"╰─    设置失败：{e}")
             return "done"

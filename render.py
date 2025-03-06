@@ -4,12 +4,12 @@ import sys
 
 sys.path.insert(0, "./thirdparty")
 
-from rich.markdown import Markdown
-from rich.console import Console
-from rich.style import Style
-from rich.theme import Theme
-from rich.text import Text
-from rich.live import Live
+from thirdparty.rich.markdown import Markdown
+from thirdparty.rich.console import Console
+from thirdparty.rich.style import Style
+from thirdparty.rich.theme import Theme
+from thirdparty.rich.text import Text
+from thirdparty.rich.live import Live
 
 # 自定义主题
 custom_theme = Theme(

@@ -12,7 +12,7 @@ if (Test-Path -Path "config.json") {
 {
     "api_key": "",
     "base_url": "",
-    "system_prompt": "你是一个熟悉计算机并具有丰富教学经验的 AI 助手，无论提出问题的是什么语言，请用中文回答我的问题",
+    "chat_prompt": "你是一个熟悉计算机并具有丰富教学经验的 AI 助手，无论提出问题的是什么语言，请用中文回答我的问题",
     "models": [
         {
             "model": "",
