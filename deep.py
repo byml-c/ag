@@ -39,15 +39,15 @@ class Deep(Chat):
                     raise Exception("Invalid Python call format")
                 ret = subprocess.run(['python3', '-c', cmd['code']], capture_output=True)
                 if ret.returncode == 0:
-                    res = { "stdout": ret.stdout.decode('utf-8') }
+                    res = { "stdout": ret.stdout.decode('utf-8'), "exitcode": ret.returncode }
                 else:
-                    res = { "stderr": ret.stderr.decode('utf-8') }
+                    res = { "stderr": ret.stderr.decode('utf-8'), "exitcode": ret.returncode }
             elif cmd['name'] == 'bash':
                 if 'code' not in cmd:
                     raise Exception("Invalid bash call format")
                 ret = subprocess.run(cmd['code'], shell=True, capture_output=True)
                 if ret.returncode == 0:
-                    res = { "stdout": ret.stdout.decode('utf-8') }
+                    res = { "stdout": ret.stdout.decode('utf-8'), "exitcode": ret.returncode }
                 else:
                     res = { "stderr": ret.stderr.decode('utf-8'), "exitcode": ret.returncode }
             cmd.update(res)

@@ -97,8 +97,9 @@ class Agent:
         if self.hist_path == HISTORY_FILE:
             time_str = time.strftime(HISTORY_FORMAT, time.localtime())
             self.hist_path = HISTORY_DIR / f"{time_str}.json"
-            os.remove(HISTORY_FILE)
         self.save_history()
+        if os.path.exists(HISTORY_FILE):
+            os.remove(HISTORY_FILE)
     
     def save_vars(self):
         """保存变量"""
@@ -303,7 +304,7 @@ class Agent:
                             print(f"│   $S{sid:<3} [{snippet['lang']:10}]: {self.short(snippet['code'])!r}")
                     print("╰─────────────")
                 
-                case 'exit':
+                case 'exit' | 'bye' | 'quit':
                     if single:
                         return 'exit'
                     else:
