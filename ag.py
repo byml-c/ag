@@ -6,7 +6,7 @@ import json
 import time
 import argparse
 
-import pyreadline3
+import pyreadline3 as readline
 import traceback
 import subprocess
 from pathlib import Path
@@ -24,23 +24,24 @@ SNIPPETS_DIR = ROOT_DIR / ".agdata" / "snippets"
 HISTORY_FORMAT = r"%Y-%m-%d_%H-%M-%S"
 
 
-# def complete_cd(text, state):
-#     # 仅当输入以 "cd " 开头时触发补全
-#     ipt = pyreadline3.get_line_buffer()
-#     if ipt.startswith("cd "):
-#         # 获取当前目录下所有匹配的文件夹
-#         pth = os.path.abspath("/".join(ipt[3:].split("/")[:-1]))
-#         dirs = [
-#             d + "/"
-#             for d in os.listdir(pth)
-#             if os.path.isdir(os.path.join(pth, d)) and d.startswith(text)
-#         ]
-#         return dirs[state] if state < len(dirs) else None
-#     return None
+def complete_cd(text, state):
+    # 仅当输入以 "cd " 开头时触发补全
+    ipt = readline.get_line_buffer()
+    if ipt.startswith("cd "):
+        # 获取当前目录下所有匹配的文件夹
+        pth = os.path.abspath("/".join(ipt[3:].split("/")[:-1]))
+        dirs = [
+            d + "/"
+            for d in os.listdir(pth)
+            if os.path.isdir(os.path.join(pth, d)) and d.startswith(text)
+        ]
+        return dirs[state] if state < len(dirs) else None
+    return None
 
 
-# pyreadline3.set_completer(complete_cd)
-# pyreadline3.parse_and_bind("tab: complete")
+rl = readline.Readline()
+rl.set_completer(complete_cd)
+rl.parse_and_bind("tab: complete")
 
 
 class Agent:
