@@ -447,6 +447,9 @@ class Agent:
                     except Exception as e:
                         print(f"╰─    设置失败：{e}")
 
+                case "ls" | "ll" | "la":
+                    os.system("dir")
+
                 case _:
                     out, err, cost_time, returncode = self.bash(cmd)
                     print(out)
