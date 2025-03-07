@@ -2,11 +2,11 @@ import sys
 from pathlib import Path
 
 # 配置文件路径
-ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
-THIRDPARTY   = ROOT_DIR / "thirdparty"
-CONFIG_FILE  = ROOT_DIR / "config.json"
-VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
-HISTORY_DIR  = ROOT_DIR / ".agdata" / "history"
+ROOT_DIR = Path(r"E:\\Programing\\ag")
+THIRDPARTY = ROOT_DIR / "thirdparty"
+CONFIG_FILE = ROOT_DIR / "config.json"
+VARS_FILE = ROOT_DIR / ".agdata" / "vars.json"
+HISTORY_DIR = ROOT_DIR / ".agdata" / "history"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"
 SNIPPETS_DIR = ROOT_DIR / ".agdata" / "snippets"
 

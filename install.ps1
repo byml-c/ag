@@ -2,7 +2,7 @@ Write-Host "Setting up the working directory"
 $ROOT_DIR = Get-Location
 $ROOT_DIR_R = $ROOT_DIR -replace '[\, /, \\]', '\\'
 $ROOT_DIR_REX = "(ROOT_DIR = Path\().*(\))", "`$1r`"$ROOT_DIR_R`"`$2"
-(Get-Content ag.py) -replace $ROOT_DIR_REX | Set-Content ag.py
+(Get-Content _global.py) -replace $ROOT_DIR_REX | Set-Content _global.py
 
 if (Test-Path -Path "config.json") {
     Write-Host "`config.json` already exists!"
