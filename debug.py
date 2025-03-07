@@ -41,6 +41,36 @@ def gen():
             nt, ct = ct[:l], ct[l:]
             yield Chunk(nt)
 
+def parse():
+    import re
+    import json
+    import traceback
+    
+    s = '\n\n```json\n[{\"name\": \"bash\", \"code\": \"git status --porcelain\"}, {\"name\": \"bash\", \"code\": \"git diff HEAD\"}]\n```'
+    commands = []
+    s = re.search(r'^([\s\S]*?)```(.*?)\n([\s\S]*)\n```([\s\S]*?)$', 
+                    s.strip(), re.S)
+    if s is None:
+        return None
+    s = s.groups()
+    if len(s) == 4 and s[1] == 'json':
+        try:
+            cmd = json.loads(s[2])
+            if type(cmd) is not list:
+                raise Exception("Invalid type")
+            for c in cmd:
+                if type(c) is not dict:
+                    raise Exception("Invalid type")
+                if "name" not in c:
+                    raise Exception("Invalid format")
+                if c['name'] not in ['python', 'bash']:
+                    raise Exception("Invalid name")
+                commands.append(c)
+        except Exception as _:
+            traceback.print_exc()
+    print(commands)
+    return commands if len(commands) > 0 else None
+
 def main():
     import rich
     from rich.markdown import Markdown
@@ -56,5 +86,6 @@ def main():
     # rich.inspect(console=console, obj=md.parsed)
 
 if __name__ == '__main__':
-    main()
+    # main()
+    parse()
     

@@ -165,7 +165,10 @@ class Agent:
                     print("╭─  󰘥  帮助（模式：{}，模型：{} ）".format(
                         "终端模式" if not single else ("深度对话" if self.config['deep'] else "普通对话"),
                         self.config['model']))
-                    print("├─  控制语法为 /+命令，终端模式直接使用命令，变量在对话时可通过 {var_name} 引用")
+                    print("├─  控制模式语法为 /+命令，终端模式可直接使用命令")
+                    print("├─    变量使用")
+                    print("│   {<var_name>}        : 使用常值变量或终端命令变量")
+                    print("│   {$S<sid>[, $S<sid>]}: 使用代码片段（其中符合深度思考格式的片段会自动执行）")
                     print("├─    控制模式")
                     print("│   new    : 保存对话并开启新对话")
                     print("│   cls    : 清空屏幕，历史、变量均不会清空")
@@ -404,12 +407,32 @@ class Agent:
         """解析输入"""
         def replace_var(match:re.Match):
             if match is None: return ''
-            val = self.vars["users"].get(match.group(1))
+            key = match.group(1).strip()
+            # 常值变量
+            val = self.vars["users"].get(key)
             if val is not None:
                 return val
-            val = self.vars["bash"].get(match.group(1))
+            # 终端命令变量
+            val = self.vars["bash"].get(key)
             if val is not None:
                 return self.bash(val)[0]
+            # 代码片段
+            if re.match(r"(\$S\d+[, ]*?)+", key):
+                sid_list, outputs = re.findall(r"\$S(\d+)", key), ''''''
+                for sid in sid_list:
+                    if int(sid) >= len(self.history['snippet']):
+                        continue
+                    s = self.history['snippet'][int(sid)]
+                    if s['lang'] == 'json':
+                        cmds = self.deep._check_parse(f"```json\n{s['code']}\n```")
+                        if cmds is not None:
+                            opt, _ = self.deep._exec(cmds)
+                            outputs += '\n ------ Run Result ------ \n'+opt
+                        else:
+                            outputs += '\n ------ json ------ \n'+s['code']
+                    else:
+                        outputs += '\n ------ '+s['lang']+' ------ \n'+s['code']
+                return outputs
             return match.group(0)
         # 替换变量
         ipt = re.sub(r"{(.*?)}", replace_var, ipt)

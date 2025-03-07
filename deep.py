@@ -28,7 +28,7 @@ class Deep(Chat):
                         raise Exception("Invalid name")
                     commands.append(c)
             except Exception as _:
-                pass
+                traceback.print_exc()
         return commands if len(commands) > 0 else None
     
     def _exec(self, commands:list[dict]):
@@ -51,7 +51,17 @@ class Deep(Chat):
                 else:
                     res = { "stderr": ret.stderr.decode('utf-8'), "exitcode": ret.returncode }
             cmd.update(res)
-        return commands
+        
+        outputs = '''''' 
+        for cmd in commands:
+            outputs += f'[{cmd["name"]}] {cmd["code"]!r}'
+            if 'stdout' in cmd:
+                outputs += f' -> stdout[ExitCode: 0]\n'
+                outputs += cmd['stdout']+'\n'
+            if 'stderr' in cmd:
+                outputs += f' -> stderr[ExitCode: {cmd["exitcode"]}]\n'
+                outputs += cmd['stderr']+'\n'
+        return outputs, json.dumps(commands, ensure_ascii=False)
 
     def chat(self, user:str, msg:str, history:dict[str, list], model:str, temperature:float=0.7, run:bool=False):
         """对话，会修改传入的历史记录"""
@@ -74,6 +84,8 @@ class Deep(Chat):
                 "role": "assistant", "content": result['answer'],
                 "metadata": { "model": model }
             })
+            if result.get('reasoning', None) is not None:
+                history['history'][-1].update({"reasoning": result['reasoning']})
 
             commands = self._check_parse(result['answer'])
             if commands is None:
@@ -82,16 +94,8 @@ class Deep(Chat):
             else:
                 # 解析出可执行代码
                 print('├─ RUN')
-                commands = self._exec(commands)
-                content = json.dumps(commands, ensure_ascii=False)
-                for cmd in commands:
-                    print(f'[{cmd["name"]}] {cmd["code"]!r}', end='')
-                    if 'stdout' in cmd:
-                        print(f' -> stdout[ExitCode: 0]')
-                        print(cmd['stdout'])
-                    if 'stderr' in cmd:
-                        print(f' -> stderr[ExitCode: {cmd["exitcode"]}]')
-                        print(cmd['stderr'])
+                outputs, content = self._exec(commands)
+                print(outputs, end='')
                 print('╰─────────────')
                 return 'exec', content, history
         except KeyboardInterrupt:

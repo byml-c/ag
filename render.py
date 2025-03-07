@@ -36,23 +36,28 @@ class MDStreamRenderer:
         self.code_list = []
         return self
     
+    def _md2snippet(self):
+        for elem in self.md.parsed:
+            if elem.type == 'fence' and elem.block:
+                elem.meta.update({
+                    "sid": self._add_snippet(elem.info, elem.content)})
+        self.live.update(self.md, refresh=True)
+    
     def _new(self, text=''):
         self.code_pose, self.code_in = -1, False
         if self.md is not None:
-            # 添加 snippet
-            for elem in self.md.parsed:
-                if elem.type == 'fence' and elem.block:
-                    elem.meta.update({
-                        "sid": self._add_snippet(elem.info, elem.content)})
-            self.live.update(self.md)
+            self._md2snippet()
             self.live.__exit__(None, None, None)
         self.buffer = text
         self.live = Live(console=console, refresh_per_second=10)
         self.live.__enter__()
 
+    def _end(self):
+        if self.md is not None:
+            self._md2snippet()
+            self.md = None
+
     def __exit__(self, exc_type, exc_value, traceback):
-        if self.live is None:
-            return 
         self.live.__exit__(exc_type, exc_value, traceback)
 
     def _add_snippet(self, lang, code):
@@ -63,7 +68,10 @@ class MDStreamRenderer:
         def _new_md(buffer:str):
             return Markdown(buffer, code_theme="monokai", inline_code_lexer="text")
 
+        if self.buffer == '' and (edl == '' or edl == '\n\n'):
+            return 
         self.buffer += edl
+        # print('code', self.code_in, 'buffer', f'{self.buffer!r}')
         try:
             new_pose = self.buffer.rfind('```')
             self.md = _new_md(self.buffer)
@@ -72,11 +80,11 @@ class MDStreamRenderer:
                 if new_pose != self.code_pose:
                     self.code_in = False
                     self.code_pose = new_pose
-                    if edl == '\n\n' or (edl == '\n' and reasoning):
+                    if edl == '\n\n' or ('close' in self.md.parsed[-1].type and self.md.parsed[-1].level == 0 and reasoning):
                         self._new()
             else:
                 if new_pose == self.code_pose:
-                    if edl == '\n\n' or (edl == '\n' and reasoning):
+                    if edl == '\n\n' or ('close' in self.md.parsed[-1].type and self.md.parsed[-1].level == 0 and reasoning):
                         # print('buffer', f'{self.buffer!r}')
                         self._new()
                 else:

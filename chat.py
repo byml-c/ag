@@ -46,6 +46,7 @@ class Chat:
                     # 打印回复过程
                     markdown.update(delta.content)
                     answer_content += delta.content
+            markdown._end()
             snippets += markdown.code_list
         if is_reasoning or is_answering:
             print()
@@ -74,7 +75,12 @@ class Chat:
                 self.choices = [
                     Choice(text, reasoning)
                 ]
-        def gen(s:str, batch:int=1000):
+        def gen(item:dict, batch:int=1000):
+            if item.get('reasoning') is not None:
+                s = item['reasoning']
+                for i in range(0, len(s), batch):
+                    yield Chunk(s[i:i+batch], True)
+            s = item['content']
             for i in range(0, len(s), batch):
                 yield Chunk(s[i:i+batch])
 
@@ -94,7 +100,7 @@ class Chat:
                 print(f"╭─  󱚣  {metadata.get('model', 'Model')}")
                 try:
                     result = self._render_response(
-                        gen(item['content']), len(snippet))
+                        gen(item), len(snippet))
                     snippet += result['snippets']
                 except:
                     print(traceback.format_exc())
@@ -124,6 +130,8 @@ class Chat:
                 "content": result['answer'],
                 "metadata": { "model": model }
             })
+            if result.get('reasoning', None) is not None:
+                history['history'][-1].update({"reasoning": result['reasoning']})
         except KeyboardInterrupt:
             print()
             print("╭─    中断")
