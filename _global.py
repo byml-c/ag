@@ -4,7 +4,7 @@ from pathlib import Path
 # 配置文件路径
 ROOT_DIR = Path("/home/byml/projects/my-style/ai_agent")
 THIRDPARTY   = ROOT_DIR / "thirdparty"
-CONFIG_FILE  = ROOT_DIR / "config.json"
+CONFIG_FILE  = ROOT_DIR / "config"  / "config.json"
 VARS_FILE    = ROOT_DIR / ".agdata" / "vars.json"
 HISTORY_DIR  = ROOT_DIR / ".agdata" / "history"
 HISTORY_FILE = ROOT_DIR / ".agdata" / "history.json"

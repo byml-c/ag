@@ -5,6 +5,8 @@ ROOT_DIR_R=$(echo $ROOT_DIR | sed -E 's/\//\\\//g')
 ROOT_DIR_REX='1,$s/(ROOT_DIR\s=\sPath\(\").*?(\"\))/\1'$ROOT_DIR_R'\2/'
 sed -i -E $ROOT_DIR_REX ai.py
 
+mkdir -p config
+cd config
 if [[ -f config.json ]]; then
     echo "\`config.json\` already exists!"
 else
@@ -24,7 +26,7 @@ else
     "deep": false
 }' > config.json
 fi
-
+cd ..
 echo "--------------------"
 while true; do
     read -p "Do you want to add alias \`ag\` to .bashrc? (y/n)" answer

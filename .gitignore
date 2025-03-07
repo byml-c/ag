@@ -1,4 +1,4 @@
-/config*.json
+/config
 /.agdata
 __pycache__
 .vscode

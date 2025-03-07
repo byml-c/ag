@@ -20,32 +20,52 @@ class Chat:
 
         snippets = []
         with MDStreamRenderer(snippet_start) as markdown:
+            in_reasoning = 'False'
             for chunk in response:
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
-                # 打印思考过程
+                
+                content = ''
                 if hasattr(delta, 'reasoning_content') and delta.reasoning_content != None:
-                    if delta.reasoning_content != "" and is_reasoning == False:
+                    in_reasoning = 'Attr'
+                    content = delta.reasoning_content
+                else:
+                    if delta.content == '<think>':
+                        in_reasoning = 'Tag'
+                        content = ""
+                    elif in_reasoning == 'Tag':
+                        if delta.content == '</think>':
+                            in_reasoning = 'False'
+                            content = ""
+                        else:
+                            content = delta.content
+                    else:
+                        in_reasoning = 'False'
+                        content = delta.content
+                
+                if in_reasoning in ['Attr', 'Tag']:
+                    # 打印思考过程
+                    if content != "" and is_reasoning == False:
                         print("├─  󰟷  THINK", flush=True)
                         markdown.update('> ')
                         is_reasoning = True
                     markdown.update(
-                        chunk=re.sub(r'\n+', '\n> ', delta.reasoning_content),
+                        chunk=re.sub(r'\n+', '\n> ', content),
                         reasoning=True
                     )
-                    reasoning_content += delta.reasoning_content
+                    reasoning_content += content
                 else:
                     # 开始回复
-                    if delta.content != "" and is_answering == False:
+                    if content != "" and is_answering == False:
                         if is_reasoning:
                             markdown._new()
                             print()
                         print("├─  󰛩  ANSWER", flush=True)
                         is_answering = True
                     # 打印回复过程
-                    markdown.update(delta.content)
-                    answer_content += delta.content
+                    markdown.update(content)
+                    answer_content += content
             markdown._end()
             snippets += markdown.code_list
         if is_reasoning or is_answering:

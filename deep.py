@@ -28,7 +28,7 @@ class Deep(Chat):
                         raise Exception("Invalid name")
                     commands.append(c)
             except Exception as _:
-                traceback.print_exc()
+                pass
         return commands if len(commands) > 0 else None
     
     def _exec(self, commands:list[dict]):

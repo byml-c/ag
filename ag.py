@@ -162,9 +162,11 @@ class Agent:
             
             match exec:
                 case 'help':
-                    print("╭─  󰘥  帮助（模式：{}，模型：{} ）".format(
+                    config_status = "默认" if CONFIG_FILE.name == "config.json" \
+                        else CONFIG_FILE.name.lstrip("config-").rstrip(".json")
+                    print("╭─  󰘥  帮助（模式：{}，模型：{}，配置：{}）".format(
                         "终端模式" if not single else ("深度对话" if self.config['deep'] else "普通对话"),
-                        self.config['model']))
+                        self.config['model'], config_status))
                     print("├─  控制模式语法为 /+命令，终端模式可直接使用命令")
                     print("├─    变量使用")
                     print("│   {<var_name>}        : 使用常值变量或终端命令变量")
@@ -291,7 +293,8 @@ class Agent:
                     for k, v in self.vars["users"].items():
                         if args == '' or re.match(args, k):
                             print_title('u')
-                            print(f"│   {k:10} = {self.short(v)!r}")
+                            content = self.short(v) if args == '' else v
+                            print(f"│   {k:10} = {content!r}")
                     for k, v in self.vars["bash"].items():
                         if args == '' or re.match(args, k):
                             print_title('b')
@@ -304,7 +307,8 @@ class Agent:
                     for sid in range(len(self.history['snippet'])):
                         snippet = self.history['snippet'][sid]
                         if args == '' or re.match(args, snippet['lang']):
-                            print(f"│   $S{sid:<3} [{snippet['lang']:10}]: {self.short(snippet['code'])!r}")
+                            content = self.short(snippet['code']) if args == '' else snippet['code']
+                            print(f"│   $S{sid:<3} [{snippet['lang']:10}]: {content!r}")
                     print("╰─────────────")
                 
                 case 'exit' | 'bye' | 'quit':
@@ -328,7 +332,6 @@ class Agent:
                     try:
                         name, command = args.split(' ', 1)
                         out, err, cost_time, returncode = self.bash(command)
-                        print('A')
                         
                         exists = None
                         if name in self.vars["users"]:
@@ -503,4 +506,13 @@ def main():
     return
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Agent")
+    parser.add_argument("-l", "--local", action='store_true', help="Use local config (\"config-local.json\").")
+    parser.add_argument("-c", "--config", type=str, help="Use custom config file.")
+    args = parser.parse_args()
+    
+    if args.local:
+        CONFIG_FILE = CONFIG_FILE.parent / CONFIG_FILE.name.replace(".json", "-local.json")
+    if args.config is not None:
+        CONFIG_FILE = Path(args.config)
     main()
