@@ -6,7 +6,7 @@ import json
 import time
 import argparse
 
-import pyreadline
+import pyreadline3
 import traceback
 import subprocess
 from pathlib import Path
@@ -26,7 +26,7 @@ HISTORY_FORMAT = r"%Y-%m-%d_%H-%M-%S"
 
 # def complete_cd(text, state):
 #     # 仅当输入以 "cd " 开头时触发补全
-#     ipt = pyreadline.get_line_buffer()
+#     ipt = pyreadline3.get_line_buffer()
 #     if ipt.startswith("cd "):
 #         # 获取当前目录下所有匹配的文件夹
 #         pth = os.path.abspath("/".join(ipt[3:].split("/")[:-1]))
@@ -39,8 +39,8 @@ HISTORY_FORMAT = r"%Y-%m-%d_%H-%M-%S"
 #     return None
 
 
-# pyreadline.set_completer(complete_cd)
-# pyreadline.parse_and_bind("tab: complete")
+# pyreadline3.set_completer(complete_cd)
+# pyreadline3.parse_and_bind("tab: complete")
 
 
 class Agent:
