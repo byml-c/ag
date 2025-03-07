@@ -215,7 +215,7 @@ class Agent:
                             "普通对话" if self.config["deep"] else "深度对话"
                         )
                     )
-                    print("│   bash   : 进入终端命令模式")
+                    print("│   cmd    : 进入终端命令模式")
                     print("│   help   : 查看帮助")
                     print("│   exit   : 退出对话")
                     print(
@@ -468,8 +468,8 @@ class Agent:
     def command(self, cmd: str):
         """控制命令模式"""
         try:
-            if cmd.startswith("bash"):
-                if cmd == "bash":
+            if cmd.startswith("cmd"):
+                if cmd == "cmd":
                     return self.terminal(None, False)
                 else:
                     return self.terminal(cmd[4:], True)
