@@ -101,7 +101,7 @@ class Chat:
                 except:
                     print(traceback.format_exc())
                 print(f"╰─────────────")
-        return history
+        return history, snippet
 
     def chat(
         self,

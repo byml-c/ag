@@ -163,9 +163,9 @@ class CodeBlock(TextElement):
     def create(cls, markdown: Markdown, token: Token) -> CodeBlock:
         node_info = token.info or ""
         lexer_name = node_info.partition(" ")[0]
-        return cls(lexer_name or "text", markdown.code_theme, token.meta.get("sid", 0))
+        return cls(lexer_name or "text", markdown.code_theme, token.meta.get("sid"))
 
-    def __init__(self, lexer_name: str, theme: str, sid:int=0) -> None:
+    def __init__(self, lexer_name: str, theme: str, sid:int=None) -> None:
         self.lexer_name = lexer_name
         self.theme = theme
         self.sid = sid
@@ -178,7 +178,11 @@ class CodeBlock(TextElement):
             code, self.lexer_name, theme=self.theme, word_wrap=True,
             line_numbers=True, indent_guides=True
         )
+        if self.sid is not None:
+            yield Text(f'   snippet {self.sid}  ', style="#e6db74 on #272822", end="")
+            yield Text(f'', justify='left', style="#272822")
         yield syntax
+        yield Segment("\n")
 
 
 class BlockQuote(TextElement):
