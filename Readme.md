@@ -36,7 +36,7 @@
 2. 配置 Python 运行环境，确保终端中 `python` 可以进入 Python 交互式界面
 3. 安装 OpenAI 包 `pip install openai`
 4. 安装必要的渲染包 `pip install pyreadline3`
-4. 在终端中运行安装脚本 `bash install.sh`，根据提示完成安装
+4. 在终端中运行安装脚本 `.\install.ps1`，根据提示完成安装
 
 ## Usage
 - 直接输入问题，按下回车键，即可得到回答。

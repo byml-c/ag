@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 # 配置文件路径
-ROOT_DIR = Path(r"E:\\Programing\\ag")
+ROOT_DIR = Path(r"D:\\Programming\\ag")
 THIRDPARTY = ROOT_DIR / "thirdparty"
 CONFIG_FILE = ROOT_DIR / "config.json"
 VARS_FILE = ROOT_DIR / ".agdata" / "vars.json"
