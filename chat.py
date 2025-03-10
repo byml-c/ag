@@ -33,16 +33,18 @@ class Chat:
                 else:
                     if delta.content == '<think>':
                         in_reasoning = 'Tag'
-                        content = ""
+                        content = ''
                     elif in_reasoning == 'Tag':
                         if delta.content == '</think>':
                             in_reasoning = 'False'
-                            content = ""
+                            content = ''
                         else:
                             content = delta.content
                     else:
                         in_reasoning = 'False'
                         content = delta.content
+                if content is None:
+                    content = ''
                 
                 if in_reasoning in ['Attr', 'Tag']:
                     # 打印思考过程

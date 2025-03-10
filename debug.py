@@ -76,16 +76,15 @@ def main():
     from rich.markdown import Markdown
     from rich.console import Console
 
+    with open('Readme.md', 'r', encoding='utf-8') as f:
+        tt[4] = f.read()
     console = Console()
     md = Markdown(tt[4])
-    for elem in md.parsed:
-        if elem.type == 'fence' and elem.block:
-            elem.meta.update({'sid': id(elem)})
     console.print(md)
     # print(md.parsed)
     # rich.inspect(console=console, obj=md.parsed)
 
 if __name__ == '__main__':
-    # main()
-    parse()
+    main()
+    # parse()
     

@@ -139,10 +139,10 @@ class Agent:
             cost_time = int((time.time() - start_time) * 1000)
             return "\033[91m---   Unexcepted Error! ---\033[0m", traceback.format_exc(), cost_time, -1
 
-    def short(self, s:str, l:int=30):
+    def short(self, s:str, l:int=25):
         """缩短字符串"""
         if len(s) > l:
-            return s[:l-10] + " ... " + s[-10:]
+            return s[:l-10] + "..." + s[-10:]
         else:
             return s
 
@@ -330,50 +330,76 @@ class Agent:
                     print()
                     print(f"╭─    设置常值变量")
                     try:
-                        name, command = args.split(' ', 1)
-                        out, err, cost_time, returncode = self.bash(command)
+                        if ' ' not in args:
+                            name, command = args, ''
+                        else:
+                            name, command = args.split(' ', 1)
                         
-                        exists = None
-                        if name in self.vars["users"]:
-                            exists = ("users", "常值")
-                        elif name in self.vars["bash"]:
-                            exists = ("bash", "终端")
-                        if exists is not None:
-                            valid = input(f"├─    {exists[1]}变量 {name} 已存在，是否覆盖？[y/n]: ")
-                            if valid.lower() == 'y':
-                                self.vars[exists[0]].pop(name)
-                            else: raise KeyboardInterrupt
-                        
-                        self.vars["users"][name] = out
-                        self.save_vars()
-                        print(f"├─  {name} = {self.short(self.vars['users'][name])!r}")
-                        print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
+                        if command == '':
+                            if self.vars["users"].get(name) is not None:
+                                self.vars["users"].pop(name)
+                                self.save_vars()
+                                print(f"╰─    变量 {name} 删除成功！")
+                            else:
+                                raise ValueError(f"变量 {name} 不存在")
+                        else:
+                            out, err, cost_time, returncode = self.bash(command)
+                            
+                            exists = None
+                            if name in self.vars["users"]:
+                                exists = ("users", "常值")
+                            elif name in self.vars["bash"]:
+                                exists = ("bash", "终端")
+                            if exists is not None:
+                                valid = input(f"├─    {exists[1]}变量 {name} 已存在，是否覆盖？[y/n]: ")
+                                if valid.lower() == 'y':
+                                    self.vars[exists[0]].pop(name)
+                                else: raise KeyboardInterrupt
+                            
+                            if out == '':
+                                raise ValueError("命令执行结果为空")
+                            else:
+                                self.vars["users"][name] = out
+                                self.save_vars()
+                                print(f"├─  {name} = {self.short(self.vars['users'][name])!r}")
+                                print(f"╰─    设置成功，  {cost_time} ms, return {returncode}")
                     except KeyboardInterrupt:
                         print(f"╰─    中断执行，  {cost_time} ms, return {returncode}")
                     except Exception as e:
-                        print(f"╰─    设置失败：{e}")
+                        print(f"╰─    设置失败：{traceback.format_exc()}")
                 
                 case 'setb' | 'setc':
                     print()
                     print(f"╭─    设置终端变量")
                     try:
-                        name, command = args.split(' ', 1)
+                        if ' ' not in args:
+                            name, command = args, ''
+                        else:
+                            name, command = args.split(' ', 1)
                         
-                        exists = None
-                        if name in self.vars["users"]:
-                            exists = ("users", "常值")
-                        elif name in self.vars["bash"]:
-                            exists = ("bash", "终端")
-                        if exists is not None:
-                            valid = input(f"├─    {exists[1]}变量 {name} 已存在，是否覆盖？[y/n]: ")
-                            if valid.lower() == 'y':
-                                self.vars[exists[0]].pop(name)
-                            else: raise KeyboardInterrupt
-                        
-                        self.vars["bash"][name] = command
-                        self.save_vars()
-                        print(f"├─  {name} = {self.vars['bash'][name]!r}")
-                        print(f"╰─    设置成功")
+                        if command == '':
+                            if self.vars["bash"].get(name) is not None:
+                                self.vars["bash"].pop(name)
+                                self.save_vars()
+                                print(f"╰─    变量 {name} 删除成功！")
+                            else:
+                                raise ValueError(f"变量 {name} 不存在")
+                        else:
+                            exists = None
+                            if name in self.vars["users"]:
+                                exists = ("users", "常值")
+                            elif name in self.vars["bash"]:
+                                exists = ("bash", "终端")
+                            if exists is not None:
+                                valid = input(f"├─    {exists[1]}变量 {name} 已存在，是否覆盖？[y/n]: ")
+                                if valid.lower() == 'y':
+                                    self.vars[exists[0]].pop(name)
+                                else: raise KeyboardInterrupt
+                            
+                            self.vars["bash"][name] = command
+                            self.save_vars()
+                            print(f"├─  {name} = {self.vars['bash'][name]!r}")
+                            print(f"╰─    设置成功")
                     except KeyboardInterrupt:
                         print(f"╰─    中断设置")
                     except Exception as e:

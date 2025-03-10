@@ -85,7 +85,6 @@ class MDStreamRenderer:
             else:
                 if new_pose == self.code_pose:
                     if edl == '\n\n' or ('close' in self.md.parsed[-1].type and self.md.parsed[-1].level == 0 and reasoning):
-                        # print('buffer', f'{self.buffer!r}')
                         self._new()
                 else:
                     self.code_pose = new_pose
