@@ -22,7 +22,7 @@ if (Test-Path -Path "config.json") {
         }
     ],
     "model": "",
-    "deep": false, 
+    "deep": false 
 }
 '@ | Out-File -FilePath "config.json" -Encoding utf8
 }

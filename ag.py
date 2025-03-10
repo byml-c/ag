@@ -63,7 +63,7 @@ class Agent:
 
     @staticmethod
     def load_config():
-        with open(CONFIG_FILE, encoding="gbk") as f:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
             config = json.load(f)
 
         if config["api_key"] == "":
@@ -84,7 +84,7 @@ class Agent:
     def load_vars(self):
         """加载变量"""
         if VARS_FILE.exists():
-            with open(VARS_FILE, encoding="gbk") as f:
+            with open(VARS_FILE, encoding="utf-8") as f:
                 return json.load(f)
         return {"users": {}, "bash": {}}
 
