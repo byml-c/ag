@@ -38,6 +38,17 @@
 4. 安装必要的渲染包 `pip install pyreadline3`
 4. 在终端中运行安装脚本 `.\install.ps1`，根据提示完成安装
 
+## 配置API-Key
+
+以[火山引擎](https://www.volcengine.com/)为例. 
+
+1. 注册 / 登录
+2. 主页中向下滚动, 找到"豆包大模型", 随便选一个模型, 点击"立即体验"
+3. 在左侧边栏中选择"开通管理"
+4. 选择模型, 点击"开通服务". 
+5. 参考兼容[OpenAI API](https://www.volcengine.com/docs/82379/1330626)文档, 在`config.json`中填入"api_key", "base_url", 以及"models.model"和"models.alias". 
+6. 这样就可以开始使用`ag`啦!
+
 ## Usage
 - 直接输入问题，按下回车键，即可得到回答。
 - 输入 `/help` 查看帮助信息。
