@@ -63,7 +63,7 @@ class Agent:
 
     @staticmethod
     def load_config():
-        with open(CONFIG_FILE, encoding="gbk") as f:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
             config = json.load(f)
 
         if config["api_key"] == "":
@@ -74,7 +74,7 @@ class Agent:
     def load_history(self, not_ok: bool = True):
         """加载对话历史"""
         if self.hist_path.exists():
-            with open(self.hist_path, encoding="gbk") as f:
+            with open(self.hist_path, encoding="utf-8") as f:
                 return json.load(f)
         if not_ok:
             return {"history": [], "snippet": []}
@@ -84,18 +84,18 @@ class Agent:
     def load_vars(self):
         """加载变量"""
         if VARS_FILE.exists():
-            with open(VARS_FILE, encoding="gbk") as f:
+            with open(VARS_FILE, encoding="utf-8") as f:
                 return json.load(f)
         return {"users": {}, "bash": {}}
 
     def save_config(self):
         """保存配置"""
-        with open(CONFIG_FILE, "w", encoding="gbk") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(self.config, f, indent=4, ensure_ascii=False)
 
     def save_history(self):
         """保存对话历史"""
-        with open(self.hist_path, "w", encoding="gbk") as f:
+        with open(self.hist_path, "w", encoding="utf-8") as f:
             json.dump(self.history, f, indent=4, ensure_ascii=False)
 
     def archive_history(self):
@@ -112,14 +112,14 @@ class Agent:
 
     def save_vars(self):
         """保存变量"""
-        with open(VARS_FILE, "w", encoding="gbk") as f:
+        with open(VARS_FILE, "w", encoding="utf-8") as f:
             json.dump(self.vars, f, indent=2, ensure_ascii=False)
 
     def update_snippet(self):
         os.makedirs(SNIPPETS_DIR, exist_ok=True)
         for sid in range(len(self.history["snippet"])):
             os.environ[f"S{sid}"] = str(SNIPPETS_DIR / f"{sid}")
-            with open(SNIPPETS_DIR / f"{sid}", "w", encoding="gbk") as f:
+            with open(SNIPPETS_DIR / f"{sid}", "w", encoding="utf-8") as f:
                 f.write(self.history["snippet"][sid]["code"])
 
     def find_model(self, s: str):
@@ -260,7 +260,7 @@ class Agent:
                             f"│   {hid:3}: [{hist_files[hid][1].name.replace('.json', '')}] ",
                             end="",
                         )
-                        with open(hist_files[hid][1], encoding="gbk") as f:
+                        with open(hist_files[hid][1], encoding="utf-8") as f:
                             hist = json.load(f)
                             if len(hist["history"]) > 1:
                                 print(
