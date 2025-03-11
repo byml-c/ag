@@ -63,7 +63,7 @@ class Agent:
 
     @staticmethod
     def load_config():
-        with open(CONFIG_FILE, encoding="utf-8") as f:
+        with open(CONFIG_FILE, encoding="gbk") as f:
             config = json.load(f)
 
         if config["api_key"] == "":
