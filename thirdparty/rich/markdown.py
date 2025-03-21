@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import re
 import sys
 from typing import ClassVar, Iterable
 
 from markdown_it import MarkdownIt
+from mdit_py_plugins.texmath import texmath_plugin
 from markdown_it.token import Token
 
 if sys.version_info >= (3, 8):
@@ -149,8 +151,10 @@ class Heading(TextElement):
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         text = self.text
-        text.justify = "left"
-        yield Text("  ", style=self.style_name, end="")
+        h_type = max(0, min(int(self.tag[1:])-1, 6))
+        icon = ['󰲡 ', '󰲣 ', '󰲥 ', '󰲧 ', '󰲩 ', '󰲫 '][h_type]
+        text = Text(f"{' '*h_type}{icon} ", style=self.style_name).append(text)
+        text.justify = 'left'
         yield text
 
 
@@ -243,16 +247,14 @@ class TableElement(MarkdownElement):
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         table = Table(box=box.SIMPLE_HEAVY)
-
         if self.header is not None and self.header.row is not None:
             for column in self.header.row.cells:
                 table.add_column(column.content)
-
+        
         if self.body is not None:
             for row in self.body.rows:
                 row_content = [element.content for element in row.cells]
                 table.add_row(*row_content)
-
         yield table
 
 
@@ -328,12 +330,13 @@ class ListElement(MarkdownElement):
 
     @classmethod
     def create(cls, markdown: Markdown, token: Token) -> ListElement:
-        return cls(token.type, int(token.attrs.get("start", 1)))
+        return cls(token.type, int(token.attrs.get("start", 1)), token.level)
 
-    def __init__(self, list_type: str, list_start: int | None) -> None:
+    def __init__(self, list_type: str, list_start: int | None, level:int=0) -> None:
         self.items: list[ListItem] = []
         self.list_type = list_type
         self.list_start = list_start
+        self.level = level
 
     def on_child_close(self, context: MarkdownContext, child: MarkdownElement) -> bool:
         assert isinstance(child, ListItem)
@@ -345,7 +348,7 @@ class ListElement(MarkdownElement):
     ) -> RenderResult:
         if self.list_type == "bullet_list_open":
             for item in self.items:
-                yield from item.render_bullet(console, options)
+                yield from item.render_bullet(console, options, self.level)
         else:
             number = 1 if self.list_start is None else self.list_start
             last_number = number + len(self.items)
@@ -367,12 +370,13 @@ class ListItem(TextElement):
         self.elements.append(child)
         return False
 
-    def render_bullet(self, console: Console, options: ConsoleOptions) -> RenderResult:
+    def render_bullet(self, console: Console, options: ConsoleOptions, level:int=0) -> RenderResult:
         render_options = options.update(width=options.max_width - 3)
         lines = console.render_lines(self.elements, render_options, style=self.style)
         bullet_style = console.get_style("markdown.item.bullet", default="none")
 
-        bullet = Segment(" • ", bullet_style)
+        bullet = [' ', ' ', ' ', ' '][(level//2) % 4]
+        bullet = Segment(f" {bullet} ", bullet_style)
         padding = Segment(" " * 3, bullet_style)
         new_line = Segment("\n")
         for first, line in loop_first(lines):
@@ -390,7 +394,7 @@ class ListItem(TextElement):
 
         new_line = Segment("\n")
         padding = Segment(" " * number_width, number_style)
-        numeral = Segment(f"{number}".rjust(number_width - 1) + " ", number_style)
+        numeral = Segment(f"{number}".rjust(number_width - 1) + ". ", number_style)
         for first, line in loop_first(lines):
             yield numeral if first else padding
             yield from line
@@ -448,6 +452,187 @@ class ImageItem(TextElement):
         yield text
 
 
+greek_map = {
+    # greek
+    'alpha': 'α', 'beta': 'β', 'gamma': 'γ', 'delta': 'δ',
+    'epsilon': 'ϵ', 'zeta': 'ζ', 'eta': 'η', 'theta': 'θ',
+    'iota': 'ι', 'kappa': 'κ', 'lambda': 'λ', 'mu': 'μ',
+    'nu': 'ν', 'xi': 'ξ', 'omicron': 'ο', 'pi': 'π',
+    'rho': 'ρ', 'sigma': 'σ', 'tau': 'τ', 'upsilon': 'υ',
+    'phi': 'φ', 'chi': 'χ', 'psi': 'ψ', 'omega': 'ω',
+    'varphi': 'φ', 'varepsilon': 'ε',
+    
+    'Alpha': 'Α', 'Beta': 'Β', 'Gamma': 'Γ', 'Delta': 'Δ',
+    'Epsilon': 'Ε', 'Zeta': 'Ζ', 'Eta': 'Η', 'Theta': 'Θ',
+    'Iota': 'Ι', 'Kappa': 'Κ', 'Lambda': 'Λ', 'Mu': 'Μ',
+    'Nu': 'Ν', 'Xi': 'Ξ', 'Omicron': 'Ο', 'Pi': 'Π',
+    'Rho': 'Ρ', 'Sigma': 'Σ', 'Tau': 'Τ', 'Upsilon': 'Υ',
+    'Phi': 'Φ', 'Chi': 'Χ', 'Psi': 'Ψ', 'Omega': 'Ω',
+    
+    # brackets
+    'lfloor': '⌊', 'rfloor': '⌋', 'lceil': '⌈', 'rceil': '⌉',
+    'langle': '⟨', 'rangle': '⟩', 'lgroup': '⟮', 'rgroup': '⟯',
+    'llangle': '⦉', 'rrangle': '⦊', 'llbracket': '⟦', 'rrbracket': '⟧',
+    'llparenthesis': '⦇', 'rrparenthesis': '⦈',
+    
+    'infty': '∞', 'infinity': '∞','aleph': 'ℵ', 'complement': '∁',
+    'backepsilon': '∍', 'eth': 'ð', 'Finv': 'Ⅎ',
+    'Im': 'ℑ', 'ell': 'ℓ', 'mho': '℧', 'wp': '℘', 'Re': 'ℜ', 'circledS': 'Ⓢ',
+    
+    # equality
+    'neq': '≠', 'leq': '≤', 'geq': '≥', 'approx': '≈', 'le': '≤', 'ge': '≥',
+    'cong': '≅', 'equiv': '≡', 'propto': '∝', 'sim': '∼',
+    'simeq': '≃', 'asymp': '≍', 'doteq': '≐', 'prec': '≺',
+    'succ': '≻', 'preceq': '≼', 'succeq': '≽', 'll': '≪',
+    'gg': '≫', 'subset': '⊂', 'supset': '⊃', 'subseteq': '⊆',
+    'supseteq': '⊇', 'sqsubset': '⊏', 'sqsupset': '⊐',
+    'sqsubseteq': '⊑', 'sqsupseteq': '⊒', 'in': '∈',
+    'ni': '∋', 'notin': '∉', 'propto': '∝', 'vdash': '⊢',
+    'dashv': '⊣', 'models': '⊨', 'perp': '⊥', 'mid': '∣',
+    'parallel': '∥', 'bowtie': '⋈', 'smile': '⌣', 'frown': '⌢',
+    'vdots': '⋮', 'cdots': '⋯', 'ldots': '…', 'ddots': '⋱',
+    'because': '∵', 'therefore': '∴', 'angle': '∠',
+    'measuredangle': '∡', 'sphericalangle': '∢',
+    
+    # sqrt
+    'sqrt': '√',
+    
+    # calc
+    'pm': '±', 'mp': '∓', 'times': '×', 'div': '÷',
+    'cdot': '·', 'ast': '∗', 'star': '⋆', 'circ': '∘',
+    'bullet': '∙', 'oplus': '⊕', 'ominus': '⊖', 'otimes': '⊗',
+    'oslash': '⊘', 'odot': '⊙', 'bigcirc': '◯', 'dagger': '†',
+    'ddagger': '‡', 'amalg': '⨿', 'cap': '∩', 'cup': '∪',
+    'uplus': '⊎', 'sqcap': '⊓', 'sqcup': '⊔', 'vee': '∨',
+    'wedge': '∧', 'diamond': '⋄', 'bigtriangleup': '△',
+    'bigtriangledown': '▽', 'triangleleft': '◁',
+    'triangleright': '▷', 'triangle': '▵', 'triangledown': '▿',
+    'trianglelefteq': '⊴', 'trianglerighteq': '⊵',
+    
+    # logic
+    'land': '∧', 'lor': '∨', 'lnot': '¬', 'forall': '∀',
+    'exists': '∃', 'nexists': '∄', 'emptyset': '∅',
+    'varnothing': '∅', 'nabla': '∇', 'partial': '∂',
+    
+    # set
+    'in': '∈', 'notin': '∉', 'subset': '⊂', 'subseteq': '⊆',
+    'supset': '⊃', 'supseteq': '⊇', 'setminus': '∖',
+    
+    # induction
+    'therefore': '∴', 'because': '∵',
+    
+    # arrow
+    'to': '→', 'gets': '←', 'leftrightarrow': '↔',
+    'uparrow': '↑', 'downarrow': '↓', 'updownarrow': '↕',
+    'mapsto': '↦', 'longmapsto': '⟼', 'hookleftarrow': '↩',
+    'hookrightarrow': '↪', 'leftharpoonup': '↼',
+    'rightharpoonup': '⇀', 'leftharpoondown': '↽',
+    'rightharpoondown': '⇁', 'rightleftharpoons': '⇌',
+    'leftrightharpoons': '⇋', 'rightleftharpoons': '⇌',
+    'leftrightarrows': '⇆', 'rightleftarrows': '⇄',
+    'upharpoonright': '↾', 'upharpoonleft': '↿',
+    'Rightarrow': '⇒', 'Leftarrow': '⇐', 'Leftrightarrow': '⇔',
+    'Uparrow': '⇑', 'Downarrow': '⇓', 'Updownarrow': '⇕',
+    'Rrightarrow': '⇛', 'Lleftarrow': '⇚', 'leadsto': '↝',
+    'implies': '⇒', 'iff': '⇔', 'upuparrows': '⇈',
+    
+    
+    # function
+    'sin': 'sin', 'cos': 'cos', 'tan': 'tan', 'cot': 'cot',
+    'csc': 'csc', 'sec': 'sec', 'sinh': 'sinh', 'cosh': 'cosh',
+    'tanh': 'tanh', 'coth': 'coth', 'csch': 'csch', 'sech': 'sech',
+    'arcsin': 'arcsin', 'arccos': 'arccos', 'arctan': 'arctan',
+    'arccot': 'arccot', 'arccsc': 'arccsc', 'arcsec': 'arcsec',
+    'arsinh': 'arsinh', 'arcosh': 'arcosh', 'artanh': 'artanh',
+    'arcoth': 'arcoth', 'arcsch': 'arcsch', 'arsech': 'arsech',
+    'lim': 'lim', 'liminf': 'liminf', 'limsup': 'limsup',
+    'max': 'max', 'min': 'min', 'sup': 'sup', 'inf': 'inf',
+    'arg': 'arg', 'ker': 'ker', 'deg': 'deg', 'det': 'det',
+    'gcd': 'gcd', 'lcm': 'lcm', 'Pr': 'Pr', 'varliminf': 'varliminf',
+    'varlimsup': 'varlimsup', 'varinjlim': 'varinjlim',
+    'varprojlim': 'varprojlim', 'hom': 'hom', 'dim': 'dim', 'mod': 'mod',
+    'ln': 'ln', 'log': 'log', 'exp': 'exp',
+    
+    # other
+    'sum': '∑', 'prod': '∏', 'int': '∫', 'oint': '∮',
+}
+
+up_map = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+    '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾',
+    'a': 'ᵃ', 'b': 'ᵇ', 'c': 'ᶜ', 'd': 'ᵈ', 'e': 'ᵉ',
+    'f': 'ᶠ', 'g': 'ᵍ', 'h': 'ʰ', 'i': 'ⁱ', 'j': 'ʲ',
+    'k': 'ᵏ', 'l': 'ˡ', 'm': 'ᵐ', 'n': 'ⁿ', 'o': 'ᵒ',
+    'p': 'ᵖ', 'r': 'ʳ', 's': 'ˢ', 't': 'ᵗ', 'u': 'ᵘ',
+    'v': 'ᵛ', 'w': 'ʷ', 'x': 'ˣ', 'y': 'ʸ', 'z': 'ᶻ',
+    'A': 'ᴬ', 'B': 'ᴮ', 'C': 'ᶜ', 'D': 'ᴰ', 'E': 'ᴱ',
+    'F': 'ᶠ', 'G': 'ᴳ', 'H': 'ᴴ', 'I': 'ᴵ', 'J': 'ᴶ',
+    'K': 'ᴷ', 'L': 'ᴸ', 'M': 'ᴹ', 'N': 'ᴺ', 'O': 'ᴼ',
+    'P': 'ᴾ', 'R': 'ᴿ', 'S': 'ˢ', 'T': 'ᵀ', 'U': 'ᵁ',
+    'V': 'ⱽ', 'W': 'ᵂ', 'X': 'ˣ', 'Y': 'ʸ', 'Z': 'ᶻ',
+    'α': 'ᵅ', 'β': 'ᵝ', 'γ': 'ᵞ', 'δ': 'ᵟ', 'ε': 'ᵋ',
+    'θ': 'ᶿ', 'ι': 'ᶥ', 'φ': 'ᶲ', 'χ': 'ᵡ', 'ψ': 'ᵠ',
+}
+
+down_map = {
+    '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+    '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+    '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎',
+    'a': 'ₐ', 'e': 'ₑ', 'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ',
+    'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ',
+    'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ',
+    'v': 'ᵥ', 'x': 'ₓ', 'β': 'ᵦ', 'γ': 'ᵧ', 'ρ': 'ᵨ',
+    'φ': 'ᵩ', 'χ': 'ᵪ',
+}
+
+mathbb_map = {
+    'A': '𝔸', 'B': '𝔹', 'C': 'ℂ', 'D': '𝔻', 'E': '𝔼',
+    'F': '𝔽', 'G': '𝔾', 'H': 'ℍ', 'I': '𝕀', 'J': '𝕁',
+    'K': '𝕂', 'L': '𝕃', 'M': '𝕄', 'N': 'ℕ', 'O': '𝕆',
+    'P': 'ℙ', 'Q': 'ℚ', 'R': 'ℝ', 'S': '𝕊', 'T': '𝕋',
+    'U': '𝕌', 'V': '𝕍', 'W': '𝕎', 'X': '𝕏', 'Y': '𝕐',
+    'Z': 'ℤ',
+    'a': '𝕒', 'b': '𝕓', 'c': '𝕔', 'd': '𝕕', 'e': '𝕖',
+    'f': '𝕗', 'g': '𝕘', 'h': '𝕙', 'i': '𝕚', 'j': '𝕛',
+    'k': '𝕜', 'l': '𝕝', 'm': '𝕞', 'n': '𝕟', 'o': '𝕠',
+    'p': '𝕡', 'q': '𝕢', 'r': '𝕣', 's': '𝕤', 't': '𝕥',
+    'u': '𝕦', 'v': '𝕧', 'w': '𝕨', 'x': '𝕩', 'y': '𝕪',
+    'z': '𝕫',
+    '0': '𝟘', '1': '𝟙', '2': '𝟚', '3': '𝟛', '4': '𝟜',
+    '5': '𝟝', '6': '𝟞', '7': '𝟟', '8': '𝟠', '9': '𝟡',
+}
+
+mathit_map = {
+    'A': '𝐴', 'B': '𝐵', 'C': '𝐶', 'D': '𝐷', 'E': '𝐸',
+    'F': '𝐹', 'G': '𝐺', 'H': '𝐻', 'I': '𝐼', 'J': '𝐽',
+    'K': '𝐾', 'L': '𝐿', 'M': '𝑀', 'N': '𝑁', 'O': '𝑂',
+    'P': '𝑃', 'Q': '𝑄', 'R': '𝑅', 'S': '𝑆', 'T': '𝑇',
+    'U': '𝑈', 'V': '𝑉', 'W': '𝑊', 'X': '𝑋', 'Y': '𝑌', 
+    'Z': '𝑍',
+    'a': '𝑎', 'b': '𝑏', 'c': '𝑐', 'd': '𝑑', 'e': '𝑒',
+    'f': '𝑓', 'g': '𝑔', 'h': 'ℎ', 'i': '𝑖', 'j': '𝑗',
+    'k': '𝑘', 'l': '𝑙', 'm': '𝑚', 'n': '𝑛', 'o': '𝑜',
+    'p': '𝑝', 'q': '𝑞', 'r': '𝑟', 's': '𝑠', 't': '𝑡',
+    'u': '𝑢', 'v': '𝑣', 'w': '𝑤', 'x': '𝑥', 'y': '𝑦',
+    'z': '𝑧',
+}
+
+mathcal_map = {
+    'A': '𝒜', 'B': 'ℬ', 'C': '𝒞', 'D': '𝒟', 'E': 'ℰ',
+    'F': 'ℱ', 'G': '𝒢', 'H': 'ℋ', 'I': 'ℐ', 'J': '𝒥',
+    'K': '𝒦', 'L': 'ℒ', 'M': 'ℳ', 'N': '𝒩', 'O': '𝒪',
+    'P': '𝒫', 'Q': '𝒬', 'R': 'ℛ', 'S': '𝒮', 'T': '𝒯',
+    'U': '𝒰', 'V': '𝒱', 'W': '𝒲', 'X': '𝒳', 'Y': '𝒴',
+    'Z': '𝒵',
+    'a': '𝒶', 'b': '𝒷', 'c': '𝒸', 'd': '𝒹', 'e': 'ℯ',
+    'f': '𝒻', 'g': 'ℊ', 'h': '𝒽', 'i': '𝒾', 'j': '𝒿',
+    'k': '𝓀', 'l': '𝓁', 'm': '𝓂', 'n': '𝓃', 'o': 'ℴ',
+    'p': '𝓅', 'q': '𝓆', 'r': '𝓇', 's': '𝓈', 't': '𝓉',
+    'u': '𝓊', 'v': '𝓋', 'w': '𝓌', 'x': '𝓍', 'y': '𝓎',
+    'z': '𝓏',
+}
+
 class MarkdownContext:
     """Manages the console render state."""
 
@@ -481,6 +666,61 @@ class MarkdownContext:
             self.stack.top.on_text(
                 self, Text.assemble(highlight_text, style=self.style_stack.current)
             )
+        elif node_type in {"math_inline"}:
+            def replace_symble(match):
+                return greek_map.get(match.group(1), match.group(0))
+            text = re.sub(r'\\([a-zA-Z]+)', replace_symble, text)
+            def replace_pow(match):
+                rpl, is_succ = '', True
+                for c in match.group(1).strip('{}'):
+                    if up_map.get(c) is None:
+                        is_succ = False
+                    else:
+                        rpl += up_map[c]
+                return rpl if is_succ else match.group(0)
+            up_str = '['+''.join(up_map.keys())+']'
+            text = re.sub(rf'\^({up_str}|\{{{up_str}\}}+)', replace_pow, text)
+            
+            def replace_down(match):
+                rpl, is_succ = '', True
+                for c in match.group(1).strip('{}'):
+                    if down_map.get(c) is None:
+                        is_succ = False
+                    else:
+                        rpl += down_map[c]
+                return rpl if is_succ else match.group(0)
+            down_str = '['+''.join(down_map.keys())+']'
+            text = re.sub(rf'_({down_str}|\{{{down_str}+\}})', replace_down, text)
+            
+            def replace_text(match):
+                return match.group(1)
+            text = re.sub(r'\\text\{(.+?)\}', replace_text, text)
+            def replace_mathbb(match):
+                rpl = ''
+                for c in match.group(1):
+                    rpl += mathbb_map.get(c, c)
+                return rpl
+            text = re.sub(r'\\mathbb\{(.+?)\}', replace_mathbb, text)
+            def replace_mathit(match):
+                rpl = ''
+                for c in match.group(1):
+                    rpl += mathit_map.get(c, c)
+                return rpl
+            text = re.sub(r'\\mathit\{(.+?)\}', replace_mathit, text)
+            def replace_mathcal(match):
+                rpl = ''
+                for c in match.group(1):
+                    rpl += mathcal_map.get(c, c)
+                return rpl
+            text = re.sub(r'\\mathcal\{(.+?)\}', replace_mathcal, text)
+            def replace_mathbf(match):
+                return match.group(1)
+            text = re.sub(r'\\mathbf\{(.+?)\}', replace_mathbf, text)
+            def replace_mathrm(match):
+                return match.group(1)
+            text = re.sub(r'\\mathrm\{(.+?)\}', replace_mathrm, text)
+            text = re.sub(r'\\([{}()\[\],])', '\\1', text)
+            self.stack.top.on_text(self, Text(text, style="markdown.math"))
         else:
             self.stack.top.on_text(self, text)
 
@@ -494,7 +734,6 @@ class MarkdownContext:
         """Leave a style context."""
         style = self.style_stack.pop()
         return style
-
 
 class Markdown(JupyterMixin):
     """A Markdown renderable.
@@ -527,10 +766,10 @@ class Markdown(JupyterMixin):
         "thead_open": TableHeaderElement,
         "tr_open": TableRowElement,
         "td_open": TableDataElement,
-        "th_open": TableDataElement,
+        "th_open": TableDataElement
     }
 
-    inlines = {"em", "strong", "code", "s"}
+    inlines = {"em", "strong", "code", "s", "math"}
 
     def __init__(
         self,
@@ -542,7 +781,9 @@ class Markdown(JupyterMixin):
         inline_code_lexer: str | None = None,
         inline_code_theme: str | None = None,
     ) -> None:
-        parser = MarkdownIt().enable("strikethrough").enable("table")
+        parser = MarkdownIt().use(
+            plugin=texmath_plugin, delimiters='brackets'
+        ).enable("strikethrough").enable("table")
         self.markup = markup
         self.parsed = parser.parse(markup)
         self.code_theme = code_theme
@@ -673,8 +914,6 @@ class Markdown(JupyterMixin):
                         and context.stack.top.on_child_close(context, element)
                     )
                     if should_render:
-                        if new_line and node_type != "inline":
-                            yield _new_line_segment
                         yield from console.render(element, context.options)
 
                 if exiting or self_closing:

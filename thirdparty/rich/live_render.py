@@ -94,7 +94,7 @@ class LiveRender:
                 shape = Segment.get_shape(lines)
             elif self.vertical_overflow == "ellipsis":
                 fold_length = len(lines)
-                lines = lines[-options.size.height:]
+                lines = lines[-options.size.height+1:]
                 overflow_text = Text(
                     f" 稍安勿燥，已生成 {fold_length} 行 ",
                     overflow="crop",

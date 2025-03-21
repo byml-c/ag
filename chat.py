@@ -53,7 +53,7 @@ class Chat:
                         markdown.update('> ')
                         is_reasoning = True
                     markdown.update(
-                        chunk=re.sub(r'\n+', '\n> ', content),
+                        chunk=re.sub(r'\n', '\n> ', content),
                         reasoning=True
                     )
                     reasoning_content += content
@@ -97,7 +97,7 @@ class Chat:
                 self.choices = [
                     Choice(text, reasoning)
                 ]
-        def gen(item:dict, batch:int=1000):
+        def gen(item:dict, batch:int=10):
             if item.get('reasoning') is not None:
                 s = item['reasoning']
                 for i in range(0, len(s), batch):

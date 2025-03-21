@@ -1,4 +1,6 @@
 #!/bin/env python
+from _global import *
+
 import os
 import re
 import sys
@@ -7,13 +9,11 @@ import time
 import argparse
 import readline
 import traceback
-import subprocess
 from pathlib import Path
 
 from chat import Chat
 from deep import Deep
-
-from _global import *
+import execute
 
 def complete_cd(text, state):
     # 仅当输入以 "cd " 开头时触发补全
@@ -124,20 +124,6 @@ class Agent:
     
     def get_user(self):
         return os.getenv("USER")
-    
-    def bash(self, cmd:str):
-        start_time = time.time()
-        try:
-            result = subprocess.run(
-                cmd, shell=True, check=True, text=True, stdin=sys.stdin, capture_output=True)
-            cost_time = int((time.time() - start_time) * 1000)
-            return result.stdout.strip(), result.stderr.strip(), cost_time, result.returncode
-        except subprocess.CalledProcessError as e:
-            cost_time = int((time.time() - start_time) * 1000)
-            return e.stdout.strip(), e.stderr.strip(), cost_time, e.returncode
-        except Exception as e:
-            cost_time = int((time.time() - start_time) * 1000)
-            return "\033[91m---   Unexcepted Error! ---\033[0m", traceback.format_exc(), cost_time, -1
 
     def short(self, s:str, l:int=25):
         """缩短字符串"""
@@ -178,7 +164,9 @@ class Agent:
                     print("│   forget : 清空历史，变量不会清空")
                     print("│   change : 切换模型")
                     print("│   chat   : 切换到{}".format("普通对话" if self.config['deep'] else "深度对话"))
+                    print("│   func   : 查看自定义函数说明")
                     print("│   bash   : 进入终端命令模式")
+                    print("│   parse  : 解析输入为实际调用输入")
                     print("│   help   : 查看帮助")
                     print("│   exit   : 退出对话")
                     print("│   show <option:name>       : 打印变量，支持正则，无参数时打印所有变量")
@@ -266,11 +254,11 @@ class Agent:
                     else:
                         print(f"╰─    模型不存在")
                 
-                case 'chat':
+                case 'chat' | 'deep':
                     print()
                     print(f"╭─    切换对话模式")
                     if cmd[4:].strip() == '1':
-                        self.config['deep'] = True
+                        self.config['deep'][1] = True
                     elif cmd[4:].strip() == '0':
                         self.config['deep'] = False
                     else:
@@ -299,6 +287,22 @@ class Agent:
                         if args == '' or re.match(args, k):
                             print_title('b')
                             print(f"│   {k:10} = {v!r}")
+                    print("╰─────────────")
+                
+                case 'func':
+                    print()
+                    print(f"╭─    自定义函数")
+                    print(f"├─  调用方法：@函数名(参数1, 参数2, ...)")
+                    print(f"├─────────────")
+                    for func in execute.func_description:
+                        if args == '' or re.match(args, func['name']):
+                            params = []
+                            for p in func['para']:
+                                params.append(f"<{p[0]}: {p[1]}>")
+                            params = ', '.join(params)
+                            icon = func.get('icon', ' ')
+                            des = self.short(func['des']) if args == '' else func['des']
+                            print(f"│   {icon}{func['name']}({params}): {des}")
                     print("╰─────────────")
                 
                 case 'snippet':
@@ -343,7 +347,7 @@ class Agent:
                             else:
                                 raise ValueError(f"变量 {name} 不存在")
                         else:
-                            out, err, cost_time, returncode = self.bash(command)
+                            out, err, cost_time, returncode = execute.bash(command)
                             
                             exists = None
                             if name in self.vars["users"]:
@@ -405,8 +409,17 @@ class Agent:
                     except Exception as e:
                         print(f"╰─    设置失败：{e}")
                 
+                case 'parse':
+                    print()
+                    print(f"╭─    解析输入")
+                    try:
+                        print(f"├─  {self.prase(args)}")
+                        print(f"╰─    解析结束")
+                    except Exception as e:
+                        print(f"╰─    解析失败：{traceback.format_exc()}")
+                
                 case _:
-                    out, err, cost_time, returncode = self.bash(cmd)
+                    out, err, cost_time, returncode = execute.bash(cmd)
                     print(out)
                     if returncode != 0:
                         print(f"├─────────────")
@@ -453,18 +466,29 @@ class Agent:
                         continue
                     s = self.history['snippet'][int(sid)]
                     if s['lang'] == 'json':
-                        cmds = self.deep._check_parse(f"```json\n{s['code']}\n```")
+                        cmds = execute.check_parse(f"```json\n{s['code']}\n```")
                         if cmds is not None:
-                            opt, _ = self.deep._exec(cmds)
+                            opt, _ = execute.parse_and_exec(cmds)
                             outputs += '\n ------ Run Result ------ \n'+opt
                         else:
                             outputs += '\n ------ json ------ \n'+s['code']
                     else:
                         outputs += '\n ------ '+s['lang']+' ------ \n'+s['code']
                 return outputs
-            return match.group(0)
         # 替换变量
         ipt = re.sub(r"{(.*?)}", replace_var, ipt)
+        
+        def replace_func(match:re.Match):
+            try:
+                name, para = match.group(1), match.group(2)
+                if execute.__dict__.get(name) is not None:
+                    return execute.__dict__[name](execute.parse_para(para))
+                else:
+                    raise AttributeError(f"Unknown function: {name}")
+            except:
+                return match.group(0)
+        # 处理函数
+        ipt = re.sub(r"@(.*?)\(([\s\S]*?)\)", replace_func, ipt, re.S)
         return ipt
 
     @staticmethod

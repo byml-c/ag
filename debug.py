@@ -2,6 +2,8 @@ import time
 import random
 from _global import *
 
+from chat import Chat
+
 class Delta:
     def __init__(self, c, r):
         if r:
@@ -26,11 +28,41 @@ tt = [
     
     "`lsblk` 是一个用于列出块设备信息的命令行工具。它显示系统中所有块设备（如硬盘、分区、挂载点等）的树状结构，帮助用户快速了解存储设备的布局。\n\n### 基本用法\n```bash\nlsblk\n```\n\n### 常用选项\n- `-a`：显示所有设备，包括空设备。\n- `-f`：显示文件系统类型。\n- `-o`：指定输出的列（如 NAME, SIZE, FSTYPE, MOUNTPOINT 等）。\n- `-p`：显示完整设备路径（如 `/dev/sda1`）。\n\n### 示例\n1. **列出所有块设备**：\n   ```bash\n   lsblk\n   ```\n\n   输出示例：\n   ```\n   NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT\n   sda      8:0    0   100G  0 disk \n   ├─sda1   8:1    0    50G  0 part /\n   └─sda2   8:2    0    50G  0 part /home\n   ```\n\n2. **显示文件系统类型**：\n   ```bash\n   lsblk -f\n   ```\n   输出示例：\n   ```\n   NAME   FSTYPE LABEL UUID                                 MOUNTPOINT\n   sda                                                       \n   ├─sda1 ext4   root  c1b9d5a2-3e7f-4b1e-8e3a-9c8b7d6e5f4a /\n   └─sda2 ext4   home  d2e8f9a1-4b6c-4d7e-8f2a-1b3c4d5e6f7b /home\n   ```\n\n3. **自定义输出列**：\n   ```bash\n   lsblk -o NAME,SIZE,MOUNTPOINT\n   ```\n   输出示例：\n   ```\n   NAME   SIZE MOUNTPOINT\n   sda    100G \n   ├─sda1  50G /\n   └─sda2  50G /home\n   ```\n\n`lsblk` 是一个简单但功能强大的工具，适合快速查看系统存储设备的状态。",
     
-    "### 示例\n1. **列出所有块设备**：\n   ```bash\n   lsblk\n   ```\n   输出示例：\n   ```\n   NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT\n   sda      8:0    0   100G  0 disk \n   ├─sda1   8:1    0    50G  0 part /\n   └─sda2   8:2 0    50G  0 part /home\n   ```\n\n"]
+    "### 示例\n1. **列出所有块设备**：\n   ```bash\n   lsblk\n   ```\n   输出示例：\n   ```\n   NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT\n   sda      8:0    0   100G  0 disk \n   ├─sda1   8:1    0    50G  0 part /\n   └─sda2   8:2 0    50G  0 part /home\n   ```\n\n",
+    
+    "- 列表\n    - 列表\n        - 列表\n           - 列表\n\n1. 列表\n    1. 列表\n        1. 列表\n           1. 列表\n\n",
+    
+    r'''> 2025.3.21 231880291 陈柏均
+
+# 习题 7
+> 求 $f(x)=e^x$ 在 $[0,1]$ 上的最佳一次逼近多项式
+
+解：设最佳一次逼近多项式为 $P_{1}(x)=ax+b$，则由 Chebyshev 定理，至少有三个点 $0 \le x_{1}<x_{2}<x_{3} \le 1$ 使得 $P_{1}(x_k)-f(x_k)=(-1)^k\sigma \max_{0 \le x \le 1}|P_{1}(x)-f(x)|(\sigma=\pm1,k=1,2,3)$。由函数连续性，$P_{1}(x)-f(x)$ 在 $[0,1]$ 至少有两个零点。由 Rolle 定理，$P_{1}'(x)-f'(x)=a-e^x$ 在 $[0,1]$ 内至少有一个零点。由于 $f''(x)=e^x>0$，故 $f'(x)$ 单调，$a-e^x$ 在 $[0,1]$ 有且仅有一个零点。由导函数连续性，必有 $P_{1}'(x_{2})-f'(x_{2})=a-e^{x_{2}}=0,x_{1}=0,x_{3}=1$，故 $e^{x_{2}}=a,P_{1}(0)-e^0=P_{1}(1)-e=-P_{1}(x_{2})+e^{x_{2}}$。从而可得 $b-1=a+b-e=-ax_{2}+e^{x_{2}},a=e^{x_{2}}$，解得 $a=e-1, b=e-e\ln(e-1)+\ln(e-1),x_{2}=\ln(e-1)$。因此，最佳一次逼近多项式为：
+$$
+P_{1}(x)=(e-1)x+e-e\ln(e-1)+\ln(e-1)
+$$
+# 习题 15
+> 用 Schwarz 不等式估计 $\int_0^1 \dfrac{x^6}{1+x} \mathrm{d}x$ 的上界，并用积分中值定理估计同一积分的上、下界，并比较其结果。
+
+# 习题 18
+> $f(x)=|x|$ 在 $[-1,1]$ 上，求在 $\varphi_{1}=\mathbf{span}\{ 1,x^2,x^4 \}$ 上的最佳平方逼近
+
+# 习题 21
+> 把 $f(x)=\text{arccos}x$ 在 $[-1,1]$ 上展开成 Chebyshev 级数
+
+# 习题 23
+> 观察物体的直线运动，得出时间 $t$ 与距离 $s$ 的关系如下表所示，求运动方程
+
+| $t / s$ | $0$ | $0.9$ | $1.9$ | $3.0$ | $3.9$ | $5.0$ |
+| ------- | --- | ----- | ----- | ----- | ----- | ----- |
+| $s / m$ | $0$ | $10$  | $30$  | $50$  | $80$  | $110$ |
+
+''',
+]
 
 def gen():
     global tt
-    ct = str(tt[1])
+    ct = str(tt[6])
     while len(ct) > 0:
         time.sleep(0.05*random.random())
         l = random.randint(8, 18)
@@ -71,20 +103,24 @@ def parse():
     print(commands)
     return commands if len(commands) > 0 else None
 
-def main():
+def raw():
     import rich
     from rich.markdown import Markdown
     from rich.console import Console
-
-    with open('Readme.md', 'r', encoding='utf-8') as f:
-        tt[4] = f.read()
+    
     console = Console()
-    md = Markdown(tt[4])
+    md = Markdown(tt[6])
     console.print(md)
+    # print(md.parsed)
+
+def main():
+    chat = Chat('', '')
+    chat._render_response(gen(), 0)
     # print(md.parsed)
     # rich.inspect(console=console, obj=md.parsed)
 
 if __name__ == '__main__':
-    main()
+    raw()
+    # main()
     # parse()
     

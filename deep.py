@@ -5,64 +5,9 @@ import traceback
 import subprocess
 
 from chat import Chat
+from execute import check_parse, parse_and_exec
 
 class Deep(Chat):
-    def _check_parse(self, s:str):
-        commands = []
-        s = re.search(r'^(.*?)```(.*?)\n(.*)\n```(.*?)$', 
-                      s.strip(), re.S)
-        if s is None:
-            return None
-        s = s.groups()
-        if len(s) == 4 and s[1] == 'json':
-            try:
-                cmd = json.loads(s[2])
-                if type(cmd) is not list:
-                    raise Exception("Invalid type")
-                for c in cmd:
-                    if type(c) is not dict:
-                        raise Exception("Invalid type")
-                    if "name" not in c:
-                        raise Exception("Invalid format")
-                    if c['name'] not in ['python', 'bash']:
-                        raise Exception("Invalid name")
-                    commands.append(c)
-            except Exception as _:
-                pass
-        return commands if len(commands) > 0 else None
-    
-    def _exec(self, commands:list[dict]):
-        for cmd in commands:
-            res = None
-            if cmd['name'] == 'python':
-                if 'code' not in cmd:
-                    raise Exception("Invalid Python call format")
-                ret = subprocess.run(['python3', '-c', cmd['code']], capture_output=True)
-                if ret.returncode == 0:
-                    res = { "stdout": ret.stdout.decode('utf-8'), "exitcode": ret.returncode }
-                else:
-                    res = { "stderr": ret.stderr.decode('utf-8'), "exitcode": ret.returncode }
-            elif cmd['name'] == 'bash':
-                if 'code' not in cmd:
-                    raise Exception("Invalid bash call format")
-                ret = subprocess.run(cmd['code'], shell=True, capture_output=True)
-                if ret.returncode == 0:
-                    res = { "stdout": ret.stdout.decode('utf-8'), "exitcode": ret.returncode }
-                else:
-                    res = { "stderr": ret.stderr.decode('utf-8'), "exitcode": ret.returncode }
-            cmd.update(res)
-        
-        outputs = '''''' 
-        for cmd in commands:
-            outputs += f'[{cmd["name"]}] {cmd["code"]!r}'
-            if 'stdout' in cmd:
-                outputs += f' -> stdout[ExitCode: 0]\n'
-                outputs += cmd['stdout']+'\n'
-            if 'stderr' in cmd:
-                outputs += f' -> stderr[ExitCode: {cmd["exitcode"]}]\n'
-                outputs += cmd['stderr']+'\n'
-        return outputs, json.dumps(commands, ensure_ascii=False)
-
     def chat(self, user:str, msg:str, history:dict[str, list], model:str, temperature:float=0.7, run:bool=False):
         """对话，会修改传入的历史记录"""
         try:
@@ -87,14 +32,14 @@ class Deep(Chat):
             if result.get('reasoning', None) is not None:
                 history['history'][-1].update({"reasoning": result['reasoning']})
 
-            commands = self._check_parse(result['answer'])
+            commands = check_parse(result['answer'])
             if commands is None:
                 print('╰─────────────')
                 return 'finish', '', history
             else:
                 # 解析出可执行代码
                 print('├─ RUN')
-                outputs, content = self._exec(commands)
+                outputs, content = parse_and_exec(commands)
                 print(outputs, end='')
                 print('╰─────────────')
                 return 'exec', content, history

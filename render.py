@@ -14,12 +14,29 @@ from rich.live import Live
 custom_theme = Theme({
     "markdown.block_quote": "#999999 on #1f1f1f",
     "markdown.block_quote_border": "#d75f00",
-    "markdown.h1": "bold #1E90FF",
-    "markdown.h2": "bold #00BFFF",
-    "markdown.h3": "bold #87CEFA",
-    "markdown.h4": "bold #87CEEB",
-    "markdown.h5": "bold #E0FFFF",
-    "markdown.h6": "#E0FFFF",
+    
+    "markdown.h1": "bold #7095e1 on #293140",
+    "markdown.h2": "bold #dbb071 on #3f362a",
+    "markdown.h3": "bold #9ac96a on #323b28",
+    "markdown.h4": "bold #1bb598 on #183731",
+    "markdown.h5": "bold #bba2ec on #383342",
+    "markdown.h6": "bold #9c7ed3 on #322c3d",
+    
+    "markdown.item.bullet": "#fd9d62",
+    "markdown.item.number": "#fd9d62",
+    
+    # "markdown.h1": "bold #1E90FF",
+    # "markdown.h1.icon": "#000000 on #1E90FF",
+    # "markdown.h2": "bold #00BFFF",
+    # "markdown.h2.icon": "#000000 on #00BFFF",
+    # "markdown.h3": "bold #87CEFA",
+    # "markdown.h3.icon": "#000000 on #87CEFA",
+    # "markdown.h4": "bold #87CEEB",
+    # "markdown.h4.icon": "#000000 on #87CEEB",
+    # "markdown.h5": "bold #E0FFFF",
+    # "markdown.h5.icon": "#000000 on #E0FFFF",
+    # "markdown.h6": "#E0FFFF",
+    # "markdown.h6.icon": "#000000 on #E0FFFF",
     "live.ellipsis": "#e6db74 on #272822"
 })
 console = Console(theme=custom_theme)
@@ -94,7 +111,6 @@ class MDStreamRenderer:
 
     def update(self, chunk:str, reasoning:bool=False):
         chunk = re.sub(r"\n{2,}", "\n\n", chunk)
-        # chunk = re.sub(r"\n\s+```", "\n```", chunk)
         length, i, newline = len(chunk), 0, False
         while i < length:
             if chunk[i] == '\n':
