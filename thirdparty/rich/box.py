@@ -236,6 +236,17 @@ SQUARE: Box = Box(
     "└─┴┘\n"
 )
 
+SQUARE_HEAVY_HEAD: Box = Box(
+    "┌─┬┐\n"
+    "│ ││\n"
+    "┝━┿┥\n"
+    "│ ││\n"
+    "├─┼┤\n"
+    "├─┼┤\n"
+    "│ ││\n"
+    "└─┴┘\n"
+)
+
 SQUARE_DOUBLE_HEAD: Box = Box(
     "┌─┬┐\n"
     "│ ││\n"
@@ -444,6 +455,7 @@ if __name__ == "__main__":  # pragma: no cover
         "ASCII_DOUBLE_HEAD",
         "SQUARE",
         "SQUARE_DOUBLE_HEAD",
+        "SQUARE_HEAVY_HEAD",
         "MINIMAL",
         "MINIMAL_HEAVY_HEAD",
         "MINIMAL_DOUBLE_HEAD",

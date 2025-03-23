@@ -25,6 +25,13 @@ custom_theme = Theme({
     "markdown.item.bullet": "#fd9d62",
     "markdown.item.number": "#fd9d62",
     
+    "markdown.link_url": "#29a3bb",
+    "markdown.hr": "#fd9d62",
+    
+    "table.border": "#b07d62",
+    "table.header": "bold #8da6e1",
+    "table.footer": "bold #8da6e1",
+    
     # "markdown.h1": "bold #1E90FF",
     # "markdown.h1.icon": "#000000 on #1E90FF",
     # "markdown.h2": "bold #00BFFF",
@@ -37,7 +44,7 @@ custom_theme = Theme({
     # "markdown.h5.icon": "#000000 on #E0FFFF",
     # "markdown.h6": "#E0FFFF",
     # "markdown.h6.icon": "#000000 on #E0FFFF",
-    "live.ellipsis": "#e6db74 on #272822"
+    "live.ellipsis": "#e6db74 on #242933"
 })
 console = Console(theme=custom_theme)
 
@@ -56,8 +63,11 @@ class MDStreamRenderer:
     def _md2snippet(self):
         for elem in self.md.parsed:
             if elem.type == 'fence' and elem.block:
+                sid = self._add_snippet(elem.info, elem.content)
                 elem.meta.update({
-                    "sid": self._add_snippet(elem.info, elem.content)})
+                    "sid": sid,
+                    "sdir": str(SNIPPETS_DIR / str(sid))
+                })
         self.live.update(self.md, refresh=True)
     
     def _new(self, text=''):
@@ -83,7 +93,7 @@ class MDStreamRenderer:
         
     def _update(self, edl:str='', reasoning:bool=False):
         def _new_md(buffer:str):
-            return Markdown(buffer, code_theme="monokai", inline_code_lexer="text")
+            return Markdown(buffer, code_theme="nord-darker", inline_code_lexer="text")
 
         if self.buffer == '' and (edl == '' or edl == '\n\n'):
             return 

@@ -28,7 +28,6 @@ from .style import Style, StyleStack
 from .syntax import Syntax
 from .text import Text, TextType
 
-
 class MarkdownElement:
     new_line: ClassVar[bool] = True
 
@@ -167,12 +166,13 @@ class CodeBlock(TextElement):
     def create(cls, markdown: Markdown, token: Token) -> CodeBlock:
         node_info = token.info or ""
         lexer_name = node_info.partition(" ")[0]
-        return cls(lexer_name or "text", markdown.code_theme, token.meta.get("sid"))
+        return cls(lexer_name or "text", markdown.code_theme, token.meta.get("sid"), token.meta.get("sdir"))
 
-    def __init__(self, lexer_name: str, theme: str, sid:int=None) -> None:
+    def __init__(self, lexer_name: str, theme: str, sid:int=None, sdir:str=None) -> None:
         self.lexer_name = lexer_name
         self.theme = theme
         self.sid = sid
+        self.sdir = sdir
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
@@ -183,8 +183,11 @@ class CodeBlock(TextElement):
             line_numbers=True, indent_guides=True
         )
         if self.sid is not None:
-            yield Text(f'   snippet {self.sid}  ', style="#e6db74 on #272822", end="")
-            yield Text(f'', justify='left', style="#272822")
+            yield Text(f'   snippet ', style="#e6db74 on #242933", end="")
+            yield Text(f'{self.sid:02}', style=Style(
+                color="#e6db74", bgcolor="#242933", link='file://'+self.sdir), end="")
+            yield Text(f'  ', style="#e6db74 on #242933", end="")
+            yield Text(f'', justify='left', style="#242933")
         yield syntax
         yield Segment("\n")
 
@@ -246,7 +249,7 @@ class TableElement(MarkdownElement):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        table = Table(box=box.SIMPLE_HEAVY)
+        table = Table(box=box.SQUARE_HEAVY_HEAD)
         if self.header is not None and self.header.row is not None:
             for column in self.header.row.cells:
                 table.add_column(column.content)
@@ -841,6 +844,7 @@ class Markdown(JupyterMixin):
                     link_style = console.get_style("markdown.link_url", default="none")
                     link_style += Style(link=href)
                     context.enter_style(link_style)
+                    context.on_text(Text(" ", style=link_style), node_type)
                 else:
                     context.stack.push(Link.create(self, token))
             elif node_type == "link_close":

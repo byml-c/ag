@@ -58,11 +58,12 @@ $$
 | $s / m$ | $0$ | $10$  | $30$  | $50$  | $80$  | $110$ |
 
 ''',
+    "[连接](https://www.baidu.com)\n`inline code`\n\n---\n\n- [ ] todo\n - [x] done\n - [-] doing\n\n---\n\n```python\nprint('abc')\n```\n另一端代码\n```js\nconsole.log(\"def\")\n```\n再看看 bash\n```bash\necho xxx\n```\n```json\n[{\"name\": \"bash\", \"code\": \"git status --porcelain\"}, {\"name\": \"bash\", \"code\": \"git diff HEAD\"}]\n```\n```c\nprintf(\"hello world\");\n```\n```cpp\nprintf(\"hello world\");\n```\n",
 ]
 
-def gen():
+def gen(id:int):
     global tt
-    ct = str(tt[6])
+    ct = str(tt[id])
     while len(ct) > 0:
         time.sleep(0.05*random.random())
         l = random.randint(8, 18)
@@ -109,18 +110,18 @@ def raw():
     from rich.console import Console
     
     console = Console()
-    md = Markdown(tt[6])
+    md = Markdown(tt[7])
     console.print(md)
-    # print(md.parsed)
+    print(md.parsed)
 
 def main():
     chat = Chat('', '')
-    chat._render_response(gen(), 0)
+    chat._render_response(gen(7), 0)
     # print(md.parsed)
     # rich.inspect(console=console, obj=md.parsed)
 
 if __name__ == '__main__':
-    raw()
-    # main()
+    # raw()
+    main()
     # parse()
     

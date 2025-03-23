@@ -627,8 +627,18 @@ class Syntax(JupyterMixin):
     ) -> RenderResult:
         segments = Segments(self._get_syntax(console, options))
         yield segments
-        yield Text(f'[ {self._lexer} ]', self._get_base_style(), justify="right", end="")
-
+        lexer_icon_map = {
+            'python': '󰌠',
+            'pws': '󰨊', 'powershell': '󰨊',
+            'bash': '', 'sh': '', 'zsh': '',
+            'c': '', 'cpp': '',
+            'js': '', 'javascript': '',
+            'json': '󰘦'
+        }
+        yield Text(
+            f'[ {lexer_icon_map.get(self._lexer, '')}  {self._lexer:>6} ]', 
+            self._get_base_style(), justify="right")
+        
     def _get_syntax(
         self,
         console: Console,
