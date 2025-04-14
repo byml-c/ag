@@ -513,7 +513,7 @@ greek_map = {
     'trianglelefteq': '⊴', 'trianglerighteq': '⊵',
     
     # logic
-    'land': '∧', 'lor': '∨', 'lnot': '¬', 'forall': '∀',
+    'land': '∧', 'lor': '∨', 'lnot': '¬', 'neg': '¬','forall': '∀',
     'exists': '∃', 'nexists': '∄', 'emptyset': '∅',
     'varnothing': '∅', 'nabla': '∇', 'partial': '∂',
     
@@ -636,6 +636,87 @@ mathcal_map = {
     'z': '𝓏',
 }
 
+class MathBlock(TextElement):
+    """A block of math."""
+
+    style_name = "markdown.math_block"
+
+    @classmethod
+    def create(cls, markdown: Markdown, token: Token) -> CodeBlock:
+        return cls(token.content.strip())
+
+    @staticmethod
+    def _replace(text:str, is_block:bool=False):
+        def replace_symble(match):
+            return greek_map.get(match.group(1), match.group(0))
+        text = re.sub(r'\\([a-zA-Z]+)', replace_symble, text)
+        def replace_pow(match):
+            rpl, is_succ = '', True
+            for c in match.group(1).strip('{}'):
+                if up_map.get(c) is None:
+                    is_succ = False
+                else:
+                    rpl += up_map[c]
+            return rpl if is_succ else match.group(0)
+        up_str = '['+''.join(up_map.keys())+']'
+        text = re.sub(rf'\^({up_str}|\{{{up_str}\}}+)', replace_pow, text)
+        
+        def replace_down(match):
+            rpl, is_succ = '', True
+            for c in match.group(1).strip('{}'):
+                if down_map.get(c) is None:
+                    is_succ = False
+                else:
+                    rpl += down_map[c]
+            return rpl if is_succ else match.group(0)
+        down_str = '['+''.join(down_map.keys())+']'
+        text = re.sub(rf'_({down_str}|\{{{down_str}+\}})', replace_down, text)
+        
+        def replace_text(match):
+            return match.group(1)
+        text = re.sub(r'\\text\{(.+?)\}', replace_text, text)
+        def replace_mathbb(match):
+            rpl = ''
+            for c in match.group(1):
+                rpl += mathbb_map.get(c, c)
+            return rpl
+        text = re.sub(r'\\mathbb\{(.+?)\}', replace_mathbb, text)
+        def replace_mathit(match):
+            rpl = ''
+            for c in match.group(1):
+                rpl += mathit_map.get(c, c)
+            return rpl
+        text = re.sub(r'\\mathit\{(.+?)\}', replace_mathit, text)
+        def replace_mathcal(match):
+            rpl = ''
+            for c in match.group(1):
+                rpl += mathcal_map.get(c, c)
+            return rpl
+        text = re.sub(r'\\mathcal\{(.+?)\}', replace_mathcal, text)
+        def replace_mathbf(match):
+            return match.group(1)
+        text = re.sub(r'\\mathbf\{(.+?)\}', replace_mathbf, text)
+        def replace_mathrm(match):
+            return match.group(1)
+        text = re.sub(r'\\mathrm\{(.+?)\}', replace_mathrm, text)
+        text = re.sub(r'(\\,)|~', '', text)
+        text = re.sub(r'\\(left|right)', '', text)
+        text = re.sub(r'\\([{}()\[\],])', '\\1', text)
+        if is_block:
+            text = re.sub(r'\\\\', '', text)
+        return text
+
+    def __init__(self, content) -> None:
+        self.content = self._replace(content, is_block=True)
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        yield Segment("\n")
+        yield Text(self.content, style=self.style_name)
+        yield Segment("\n")
+    
+
 class MarkdownContext:
     """Manages the console render state."""
 
@@ -670,60 +751,8 @@ class MarkdownContext:
                 self, Text.assemble(highlight_text, style=self.style_stack.current)
             )
         elif node_type in {"math_inline"}:
-            def replace_symble(match):
-                return greek_map.get(match.group(1), match.group(0))
-            text = re.sub(r'\\([a-zA-Z]+)', replace_symble, text)
-            def replace_pow(match):
-                rpl, is_succ = '', True
-                for c in match.group(1).strip('{}'):
-                    if up_map.get(c) is None:
-                        is_succ = False
-                    else:
-                        rpl += up_map[c]
-                return rpl if is_succ else match.group(0)
-            up_str = '['+''.join(up_map.keys())+']'
-            text = re.sub(rf'\^({up_str}|\{{{up_str}\}}+)', replace_pow, text)
-            
-            def replace_down(match):
-                rpl, is_succ = '', True
-                for c in match.group(1).strip('{}'):
-                    if down_map.get(c) is None:
-                        is_succ = False
-                    else:
-                        rpl += down_map[c]
-                return rpl if is_succ else match.group(0)
-            down_str = '['+''.join(down_map.keys())+']'
-            text = re.sub(rf'_({down_str}|\{{{down_str}+\}})', replace_down, text)
-            
-            def replace_text(match):
-                return match.group(1)
-            text = re.sub(r'\\text\{(.+?)\}', replace_text, text)
-            def replace_mathbb(match):
-                rpl = ''
-                for c in match.group(1):
-                    rpl += mathbb_map.get(c, c)
-                return rpl
-            text = re.sub(r'\\mathbb\{(.+?)\}', replace_mathbb, text)
-            def replace_mathit(match):
-                rpl = ''
-                for c in match.group(1):
-                    rpl += mathit_map.get(c, c)
-                return rpl
-            text = re.sub(r'\\mathit\{(.+?)\}', replace_mathit, text)
-            def replace_mathcal(match):
-                rpl = ''
-                for c in match.group(1):
-                    rpl += mathcal_map.get(c, c)
-                return rpl
-            text = re.sub(r'\\mathcal\{(.+?)\}', replace_mathcal, text)
-            def replace_mathbf(match):
-                return match.group(1)
-            text = re.sub(r'\\mathbf\{(.+?)\}', replace_mathbf, text)
-            def replace_mathrm(match):
-                return match.group(1)
-            text = re.sub(r'\\mathrm\{(.+?)\}', replace_mathrm, text)
-            text = re.sub(r'\\([{}()\[\],])', '\\1', text)
-            self.stack.top.on_text(self, Text(text, style="markdown.math"))
+            text = MathBlock._replace(text)
+            self.stack.top.on_text(self, Text(text, style="markdown.math_inline"))
         else:
             self.stack.top.on_text(self, text)
 
@@ -758,6 +787,7 @@ class Markdown(JupyterMixin):
         "heading_open": Heading,
         "fence": CodeBlock,
         "code_block": CodeBlock,
+        "math_block": MathBlock,
         "blockquote_open": BlockQuote,
         "hr": HorizontalRule,
         "bullet_list_open": ListElement,
@@ -869,6 +899,7 @@ class Markdown(JupyterMixin):
                 tag in inline_style_tags
                 and node_type != "fence"
                 and node_type != "code_block"
+                and node_type != "math_block"
             ):
                 if entering:
                     # If it's an opening inline token e.g. strong, em, etc.

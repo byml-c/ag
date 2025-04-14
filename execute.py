@@ -5,6 +5,7 @@ import sys
 import json
 import time
 import base64
+import pyperclip
 import traceback
 import subprocess
 import numpy as np
@@ -110,17 +111,23 @@ func_description = [
     {
         'name': 'screen',
         'icon': ' ',
-        'para': [('str[option]', 'info')],
-        'des': '获取屏幕截图，并交由本地 VLM 解释，返回描述。可以通过 info 添加额外描述，以帮助 VLM 更好地解释图片。'
+        'para': [('str[optional]', 'info')],
+        'des': '获取屏幕截图，并交由豆包 VLM 解释，返回描述。可以通过 info 添加额外描述，以帮助 VLM 更好地解释图片。'
     },
     {
         'name': 'image',
         'icon': ' ',
-        'para': [('str', 'file path'), ('str[option]', 'info')],
-        'des': '将图片交由本地 VLM 解释，返回描述。可以通过 info 添加额外描述，以帮助 VLM 更好地解释图片。'
+        'para': [('str', 'file path'), ('str[optional]', 'info')],
+        'des': '将图片交由豆包 VLM 解释，返回描述。可以通过 info 添加额外描述，以帮助 VLM 更好地解释图片。'
+    },
+    {
+        'name': 'clip',
+        'icon': '󱉦 ',
+        'para': [],
+        'des': '使用剪贴板中的内容。'
     }
 ]
-def file(args:list[str]) -> str:
+def file(args:list[str], config:dict) -> str:
     if len(args) < 0:
         raise IndexError('parameter is empty!')
     
@@ -134,12 +141,16 @@ def file(args:list[str]) -> str:
     else:
         raise RuntimeError(f"fail to fetch {path}, stderr: "+err)
 
-def image(args:list[str]) -> str:
+def image(args:list[str], config:dict) -> str:
     if len(args) < 1:
         raise IndexError('parameter is empty!')
     image_path = args[0]
     if not Path(image_path).exists():
         raise FileNotFoundError(f"file {image_path} not exists!")
+    if config.get('api_key') is None \
+        or config.get('base_url') is None\
+        or config.get('model') is None:
+        raise RuntimeError('api_key, base_url or model is None!')
     
     if len(args) > 1:
         info = ''.join(args[1:])
@@ -153,19 +164,19 @@ def image(args:list[str]) -> str:
         os.environ['http_proxy'] = ''
         os.environ['https_proxy'] = ''
         client = OpenAI(
-            api_key="Ollama",
-            base_url="http://localhost:11434/v1/"
+            api_key=config['api_key'],
+            base_url=config['base_url'],
         )
         start = time.time()
         response = client.chat.completions.create(
-            model="minicpm-v:latest",
+            model=config['model'],
             messages=[{
                     "role": "user",
                     "content": [
                         {
                             "type": "text",
-                            "text": "你会收到一张屏幕截图，你需要尽量详细地描述屏幕中的内容。" if info is None \
-                                else "你会收到一张屏幕截图，请从截图中提取信息，回答这个问题：屏幕中，"+info
+                            "text": "你会收到一张图片，你需要尽量详细地描述图片中的内容。" if info is None \
+                                else "你会收到一张图片，请先仔细从图片中提取信息，然后回答这个问题：屏幕中，"+info
                         },
                         {
                             "type": "image_url",
@@ -189,7 +200,7 @@ def image(args:list[str]) -> str:
         print('生成出错：', traceback.format_exc())
         raise Exception('生成出错')
 
-def screen(args:list[str]) -> str:
+def screen(args:list[str], config:dict) -> str:
     print('倒计时：', end='')
     for i in range(3, 0, -1):
         print(i, end=' >> ', flush=True)
@@ -198,4 +209,8 @@ def screen(args:list[str]) -> str:
     img_path = DATA_DIR / "tmp.png"
     bash(f'gnome-screenshot -f {img_path.__str__()}')
     print('截图完成，VLM 处理中……')
-    return image(args=[img_path.__str__(), *args])
+    return image(args=[img_path.__str__(), *args], config=config)
+
+def clip(args:list[str], config:dict) -> str:
+    clip_content = pyperclip.paste() 
+    return clip_content

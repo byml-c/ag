@@ -59,6 +59,8 @@ $$
 
 ''',
     "[连接](https://www.baidu.com)\n`inline code`\n\n---\n\n- [ ] todo\n - [x] done\n - [-] doing\n\n---\n\n```python\nprint('abc')\n```\n另一端代码\n```js\nconsole.log(\"def\")\n```\n再看看 bash\n```bash\necho xxx\n```\n```json\n[{\"name\": \"bash\", \"code\": \"git status --porcelain\"}, {\"name\": \"bash\", \"code\": \"git diff HEAD\"}]\n```\n```c\nprintf(\"hello world\");\n```\n```cpp\nprintf(\"hello world\");\n```\n",
+    """\n\n要证明命题 \\(\\neg\\neg\\neg\\neg p \\to p\\)，可以通过以下步骤（基于经典逻辑中的双重否定律）：\n\n### 证明过程：\n1. **假设前提**：  \n   假设 \\(\\neg\\neg\\neg\\neg p\\) 成立。\n\n2. **第一次双重否定消除**：  \n   \\(\\neg\\neg\\neg\\neg p\\) 等价于 \\(\\neg\\neg(\\neg\\neg p)\\)。根据双重否定律（\\(\\neg\\neg q \\equiv q\\)），有：\n   \\[\n   \\neg\\neg(\\neg\\neg p) \\implies \\neg\\neg p.\n   \\]\n\n3. **第二次双重否定消除**：  \n   再次应用双重否定律，\\(\\neg\\neg p\\) 等价于 \\(p\\)，因此：\n   \\[\n   \\neg\\neg p \\implies p.\n   \\]\n\n4. **导出结论**：  \n   通过两次双重否定消除，从 \\(\\neg\\neg\\neg\\neg p\\) 推导出 \\(p\\)，即：\n   \\[\n   \\neg\\neg\\neg\\neg p \\implies p.\n   \\]\n\n### 逻辑等价性解释：\n四次否定 \\(\\neg\\neg\\neg\\neg p\\) 可分解为两次双重否定：\n- 内层双重否定：\\(\\neg\\neg p \\equiv p\\)。\n- 外层双重否定：\\(\\neg\\neg(\\neg\\neg p) \\equiv \\neg\\neg p \\equiv p\\)。\n\n因此，\\(\\neg\\neg\\neg\\neg p \\to p\\) 等价于 \\(p \\to p\\)，显然是永真式。\n\n### 结论：\n在经典逻辑中，\\(\\neg\\neg\\neg\\neg p \\to p\\) 成立。
+    """
 ]
 
 def gen(id:int):
@@ -104,24 +106,25 @@ def parse():
     print(commands)
     return commands if len(commands) > 0 else None
 
-def raw():
+def raw(id:int):
     import rich
     from rich.markdown import Markdown
     from rich.console import Console
     
     console = Console()
-    md = Markdown(tt[7])
+    md = Markdown(tt[id])
     console.print(md)
     print(md.parsed)
 
-def main():
+def main(id:int):
     chat = Chat('', '')
-    chat._render_response(gen(7), 0)
+    chat._render_response(gen(id=id), 0)
     # print(md.parsed)
     # rich.inspect(console=console, obj=md.parsed)
 
 if __name__ == '__main__':
-    # raw()
-    main()
+    sid = 8
+    raw(sid)
+    # main(sid)
     # parse()
     

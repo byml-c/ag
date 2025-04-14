@@ -482,7 +482,10 @@ class Agent:
             try:
                 name, para = match.group(1), match.group(2)
                 if execute.__dict__.get(name) is not None:
-                    return execute.__dict__[name](execute.parse_para(para))
+                    return execute.__dict__[name](
+                        execute.parse_para(para),
+                        self.config.get('functions', {}).get(name, {})
+                    )
                 else:
                     raise AttributeError(f"Unknown function: {name}")
             except:
