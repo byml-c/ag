@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 from openai import OpenAI
+from typing import Literal
 from _global import *
 
 def bash(cmd):
@@ -117,14 +118,14 @@ func_description = [
     {
         'name': 'image',
         'icon': ' ',
-        'para': [('str', 'file path'), ('str[optional]', 'info')],
+        'para': [('str', '"clip" / file path'), ('str[optional]', 'info')],
         'des': '将图片交由豆包 VLM 解释，返回描述。可以通过 info 添加额外描述，以帮助 VLM 更好地解释图片。'
     },
     {
         'name': 'clip',
         'icon': '󱉦 ',
-        'para': [],
-        'des': '使用剪贴板中的内容。'
+        'para': [('str[optional]', 'info')],
+        'des': '使用剪贴板中的内容。如果剪贴板中是图片，则将图片交由豆包 VLM 解释，返回描述。可以通过 info 添加额外描述，以帮助 VLM 更好地解释图片。'
     }
 ]
 def file(args:list[str], config:dict) -> str:
@@ -144,7 +145,12 @@ def file(args:list[str], config:dict) -> str:
 def image(args:list[str], config:dict) -> str:
     if len(args) < 1:
         raise IndexError('parameter is empty!')
+
     image_path = args[0]
+    if image_path == 'clip':
+        clip([], {}, call_image='no')
+        image_path = DATA_DIR / "tmp.png"
+
     if not Path(image_path).exists():
         raise FileNotFoundError(f"file {image_path} not exists!")
     if config.get('api_key') is None \
@@ -152,7 +158,7 @@ def image(args:list[str], config:dict) -> str:
         or config.get('model') is None:
         raise RuntimeError('api_key, base_url or model is None!')
     
-    if len(args) > 1:
+    if len(args) > 1 and args[1] != '':
         info = ''.join(args[1:])
     else: info = None
     
@@ -211,6 +217,15 @@ def screen(args:list[str], config:dict) -> str:
     print('截图完成，VLM 处理中……')
     return image(args=[img_path.__str__(), *args], config=config)
 
-def clip(args:list[str], config:dict) -> str:
-    clip_content = pyperclip.paste() 
-    return clip_content
+def clip(args:list[str], config:dict, call_image:Literal['auto', 'no']='auto') -> str:
+    clip_content = pyperclip.paste()
+    if clip_content == '':
+        # 尝试读取图片
+        img_path = DATA_DIR / "tmp.png"
+        bash(f'xclip -selection clipboard -t image/png -o > {img_path.__str__()}')
+        if call_image == 'auto':
+            return image(args=[img_path.__str__(), *args], config=config)
+        else:
+            return img_path.__str__()
+    else:
+        return clip_content

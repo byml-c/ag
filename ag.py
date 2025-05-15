@@ -457,7 +457,7 @@ class Agent:
             # 终端命令变量
             val = self.vars["bash"].get(key)
             if val is not None:
-                return self.bash(val)[0]
+                return execute.bash(val)[0]
             # 代码片段
             if re.match(r"(\$S\d+[, ]*?)+", key):
                 sid_list, outputs = re.findall(r"\$S(\d+)", key), ''''''

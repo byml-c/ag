@@ -114,7 +114,7 @@ def raw(id:int):
     console = Console()
     md = Markdown(tt[id])
     console.print(md)
-    print(md.parsed)
+    # print(md.parsed)
 
 def main(id:int):
     chat = Chat('', '')

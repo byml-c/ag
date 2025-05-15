@@ -455,7 +455,7 @@ class ImageItem(TextElement):
         yield text
 
 
-greek_map = {
+symbol_map = {
     # greek
     'alpha': 'α', 'beta': 'β', 'gamma': 'γ', 'delta': 'δ',
     'epsilon': 'ϵ', 'zeta': 'ζ', 'eta': 'η', 'theta': 'θ',
@@ -466,7 +466,7 @@ greek_map = {
     'varphi': 'φ', 'varepsilon': 'ε',
     
     'Alpha': 'Α', 'Beta': 'Β', 'Gamma': 'Γ', 'Delta': 'Δ',
-    'Epsilon': 'Ε', 'Zeta': 'Ζ', 'Eta': 'Η', 'Theta': 'Θ',
+    'Upsilon': 'Υ', 'Zeta': 'Ζ', 'Eta': 'Η', 'Theta': 'Θ',
     'Iota': 'Ι', 'Kappa': 'Κ', 'Lambda': 'Λ', 'Mu': 'Μ',
     'Nu': 'Ν', 'Xi': 'Ξ', 'Omicron': 'Ο', 'Pi': 'Π',
     'Rho': 'Ρ', 'Sigma': 'Σ', 'Tau': 'Τ', 'Upsilon': 'Υ',
@@ -475,69 +475,70 @@ greek_map = {
     # brackets
     'lfloor': '⌊', 'rfloor': '⌋', 'lceil': '⌈', 'rceil': '⌉',
     'langle': '⟨', 'rangle': '⟩', 'lgroup': '⟮', 'rgroup': '⟯',
-    'llangle': '⦉', 'rrangle': '⦊', 'llbracket': '⟦', 'rrbracket': '⟧',
+    'llbracket': '⟦', 'rrbracket': '⟧',
     'llparenthesis': '⦇', 'rrparenthesis': '⦈',
     
-    'infty': '∞', 'infinity': '∞','aleph': 'ℵ', 'complement': '∁',
+    'infty': '∞ ', 'infinity': '∞ ','aleph': 'ℵ ', 'complement': '∁',
     'backepsilon': '∍', 'eth': 'ð', 'Finv': 'Ⅎ',
-    'Im': 'ℑ', 'ell': 'ℓ', 'mho': '℧', 'wp': '℘', 'Re': 'ℜ', 'circledS': 'Ⓢ',
+    'Im': 'ℑ ', 'ell': 'ℓ', 'mho': '℧ ', 'wp': '℘', 'Re': 'ℜ',
     
     # equality
     'neq': '≠', 'leq': '≤', 'geq': '≥', 'approx': '≈', 'le': '≤', 'ge': '≥',
-    'cong': '≅', 'equiv': '≡', 'propto': '∝', 'sim': '∼',
-    'simeq': '≃', 'asymp': '≍', 'doteq': '≐', 'prec': '≺',
-    'succ': '≻', 'preceq': '≼', 'succeq': '≽', 'll': '≪',
-    'gg': '≫', 'subset': '⊂', 'supset': '⊃', 'subseteq': '⊆',
-    'supseteq': '⊇', 'sqsubset': '⊏', 'sqsupset': '⊐',
-    'sqsubseteq': '⊑', 'sqsupseteq': '⊒', 'in': '∈',
-    'ni': '∋', 'notin': '∉', 'propto': '∝', 'vdash': '⊢',
-    'dashv': '⊣', 'models': '⊨', 'perp': '⊥', 'mid': '∣',
-    'parallel': '∥', 'bowtie': '⋈', 'smile': '⌣', 'frown': '⌢',
-    'vdots': '⋮', 'cdots': '⋯', 'ldots': '…', 'ddots': '⋱',
-    'because': '∵', 'therefore': '∴', 'angle': '∠',
-    'measuredangle': '∡', 'sphericalangle': '∢',
+    'cong': '≅', 'equiv': '≡ ', 'propto': '∝ ', 'sim': '∼',
+    'simeq': '≃ ', 'asymp': '≍', 'doteq': '≐', 'prec': '≺',
+    'succ': '≻', 'preceq': '≼', 'succeq': '≽', 'll': '≪ ',
+    'gg': '≫ ', 'subset': '⊂ ', 'supset': '⊃ ', 'subseteq': '⊆ ',
+    'supseteq': '⊇ ', 'sqsubset': '⊏', 'sqsupset': '⊐',
+    'sqsubseteq': '⊑', 'sqsupseteq': '⊒', 'in': '∈ ',
+    'ni': '∋ ', 'notin': '∉ ', 'propto': '∝ ', 'vdash': '⊢ ',
+    'dashv': '⊣ ', 'models': '⊨ ', 'perp': '⊥ ', 'mid': '∣ ',
+    'parallel': '∥ ', 'bowtie': '⋈ ', 'smile': '⌣', 'frown': '⌢',
+    'vdots': '⋮ ', 'cdots': '⋯ ', 'ldots': '…', 'ddots': '⋱ ',
+    'because': '∵ ', 'therefore': '∴ ', 'angle': '∠ ',
+    'measuredangle': '∡ ', 'sphericalangle': '∢ ',
     
     # sqrt
     'sqrt': '√',
     
     # calc
-    'pm': '±', 'mp': '∓', 'times': '×', 'div': '÷',
+    'pm': '±', 'mp': '∓ ', 'times': '×', 'div': '÷',
     'cdot': '·', 'ast': '∗', 'star': '⋆', 'circ': '∘',
-    'bullet': '∙', 'oplus': '⊕', 'ominus': '⊖', 'otimes': '⊗',
-    'oslash': '⊘', 'odot': '⊙', 'bigcirc': '◯', 'dagger': '†',
-    'ddagger': '‡', 'amalg': '⨿', 'cap': '∩', 'cup': '∪',
-    'uplus': '⊎', 'sqcap': '⊓', 'sqcup': '⊔', 'vee': '∨',
-    'wedge': '∧', 'diamond': '⋄', 'bigtriangleup': '△',
-    'bigtriangledown': '▽', 'triangleleft': '◁',
-    'triangleright': '▷', 'triangle': '▵', 'triangledown': '▿',
+    'bullet': '∙', 'oplus': '⊕ ', 'ominus': '⊖ ', 'otimes': '⊗ ',
+    'oslash': '⊘ ', 'odot': '⊙ ', 'bigcirc': '◯ ', 'dagger': '†',
+    'ddagger': '‡', 'amalg': '⨿ ', 'cap': '∩ ', 'cup': '∪ ',
+    'uplus': '⊎', 'sqcap': '⊓', 'sqcup': '⊔', 'vee': '∨ ',
+    'wedge': '∧ ', 'diamond': '⋄ ', 'bigtriangleup': '△ ',
+    'bigtriangledown': '▽ ', 'triangleleft': '◁ ',
+    'triangleright': '▷ ', 'triangle': '▵', 'triangledown': '▿ ',
     'trianglelefteq': '⊴', 'trianglerighteq': '⊵',
     
     # logic
-    'land': '∧', 'lor': '∨', 'lnot': '¬', 'neg': '¬','forall': '∀',
-    'exists': '∃', 'nexists': '∄', 'emptyset': '∅',
-    'varnothing': '∅', 'nabla': '∇', 'partial': '∂',
+    'land': '∧ ', 'lor': '∨ ', 'lnot': '¬', 'neg': '¬','forall': '∀ ',
+    'exists': '∃ ', 'nexists': '∄ ', 'emptyset': '∅ ',
+    'varnothing': '∅ ', 'nabla': '∇ ', 'partial': '∂',
     
     # set
-    'in': '∈', 'notin': '∉', 'subset': '⊂', 'subseteq': '⊆',
-    'supset': '⊃', 'supseteq': '⊇', 'setminus': '∖',
+    'in': '∈ ', 'notin': '∉ ', 'subset': '⊂ ', 'subseteq': '⊆ ',
+    'supset': '⊃ ', 'supseteq': '⊇ ', 'setminus': '∖',
     
     # induction
-    'therefore': '∴', 'because': '∵',
+    'therefore': '∴ ', 'because': '∵ ',
     
     # arrow
-    'to': '→', 'gets': '←', 'leftrightarrow': '↔',
-    'uparrow': '↑', 'downarrow': '↓', 'updownarrow': '↕',
-    'mapsto': '↦', 'longmapsto': '⟼', 'hookleftarrow': '↩',
-    'hookrightarrow': '↪', 'leftharpoonup': '↼',
-    'rightharpoonup': '⇀', 'leftharpoondown': '↽',
-    'rightharpoondown': '⇁', 'rightleftharpoons': '⇌',
-    'leftrightharpoons': '⇋', 'rightleftharpoons': '⇌',
-    'leftrightarrows': '⇆', 'rightleftarrows': '⇄',
+    'to': '→ ', 'gets': '← ', 'leftrightarrow': '↔ ',
+    'uparrow': '↑ ', 'downarrow': '↓ ', 'updownarrow': '↕ ',
+    'mapsto': '↦ ', 'longmapsto': '⟼ ', 'hookleftarrow': '↩ ',
+    'hookrightarrow': '↪ ', 'leftharpoonup': '↼ ',
+    'rightharpoonup': '⇀ ', 'leftharpoondown': '↽ ',
+    'rightharpoondown': '⇁ ', 'rightleftharpoons': '⇌ ',
+    'leftrightharpoons': '⇋ ', 'rightleftharpoons': '⇌ ',
+    'leftrightarrows': '⇆ ', 'rightleftarrows': '⇄ ',
     'upharpoonright': '↾', 'upharpoonleft': '↿',
-    'Rightarrow': '⇒', 'Leftarrow': '⇐', 'Leftrightarrow': '⇔',
-    'Uparrow': '⇑', 'Downarrow': '⇓', 'Updownarrow': '⇕',
+    'Rightarrow': '⇒ ', 'Leftarrow': '⇐ ', 'Leftrightarrow': '⇔ ',
+    'LongLeftrightarrow': '⟺ ', 'Longrightarrow': '⟹ ', 'Longleftarrow': '⟸ ',
+    'Uparrow': '⇑', 'Downarrow': '⇓', 'Updownarrow': '⇕ ',
     'Rrightarrow': '⇛', 'Lleftarrow': '⇚', 'leadsto': '↝',
-    'implies': '⇒', 'iff': '⇔', 'upuparrows': '⇈',
+    'implies': '⟹ ', 'iff': '⟺ ', 'upuparrows': '⇈',
     
     
     # function
@@ -557,7 +558,7 @@ greek_map = {
     'ln': 'ln', 'log': 'log', 'exp': 'exp',
     
     # other
-    'sum': '∑', 'prod': '∏', 'int': '∫', 'oint': '∮',
+    'sum': '∑', 'prod': '∏', 'int': '∫ ', 'oint': '∮ ',
 }
 
 up_map = {
@@ -648,7 +649,7 @@ class MathBlock(TextElement):
     @staticmethod
     def _replace(text:str, is_block:bool=False):
         def replace_symble(match):
-            return greek_map.get(match.group(1), match.group(0))
+            return symbol_map.get(match.group(1), match.group(0))
         text = re.sub(r'\\([a-zA-Z]+)', replace_symble, text)
         def replace_pow(match):
             rpl, is_succ = '', True
@@ -694,10 +695,10 @@ class MathBlock(TextElement):
             return rpl
         text = re.sub(r'\\mathcal\{(.+?)\}', replace_mathcal, text)
         def replace_mathbf(match):
-            return match.group(1)
+            return match.group(1)+' '
         text = re.sub(r'\\mathbf\{(.+?)\}', replace_mathbf, text)
         def replace_mathrm(match):
-            return match.group(1)
+            return match.group(1)+' '
         text = re.sub(r'\\mathrm\{(.+?)\}', replace_mathrm, text)
         text = re.sub(r'(\\,)|~', '', text)
         text = re.sub(r'\\(left|right)', '', text)
